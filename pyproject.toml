@@ -1,5 +1,5 @@
 [project]
-name = "code-aware-rag"
+name = "coderag"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -7,11 +7,28 @@ authors = [
     { name = "Koray Erdem", email = "korayerdem5252@gmail.com" }
 ]
 requires-python = ">=3.14"
-dependencies = []
-
+dependencies = [
+    "pydantic-settings>=2.15.0",
+    "typer>=0.27.3",
+]
 [project.scripts]
-code-aware-rag = "code_aware_rag:main"
+rag = "coderag.cli:app"
 
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

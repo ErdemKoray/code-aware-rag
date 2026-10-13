@@ -1,0 +1,6 @@
+# <type>(<scope>): <summary>   (imperative, lowercase, ≤72 chars)
+#
+# types:  feat fix test refactor docs chore perf eval
+# scopes: scan parsing chunking graph embed index retrieve generate api cli config eval
+#
+# Body (optional): why this change, not what.
