@@ -37,3 +37,14 @@ The owner wants to understand every line. Follow these rules strictly:
   Scopes: scan, parsing, chunking, graph, embed, index, retrieve, generate, api, cli, config, eval.
 - One branch per sprint (`sprint/sNN-name`), merged via PR, then tagged `sprint-NN`.
 - Type hints everywhere. Every new behavior gets a test.
+
+## Working mode
+The owner supervises and reviews; you write the code. Keep every change reviewable:
+- Before any edit, state the plan in a few lines and wait for approval.
+- One small step at a time: one class, one function or one file per diff.
+- After each edit, explain in Turkish what changed and why, pointing out
+  non-obvious lines and design decisions.
+- Every new behavior gets a test in the same step.
+- After each step, run tests and ruff and report the results.
+- If the owner asks "why", answer before continuing.
+- Reply to the owner in Turkish. Code, identifiers, comments, CLI output and commit messages in English.
