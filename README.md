@@ -69,7 +69,7 @@ Clone the target repository at its pinned version:
 
 ```bash
 git clone https://github.com/fastapi/fastapi data/repos/fastapi
-git -C data/repos/fastapi checkout <TAG>
+git -C data/repos/fastapi checkout <0.143.0>
 ```
 
 Check the setup:
@@ -83,8 +83,8 @@ uv run pytest
 
 Development and evaluation run against a pinned version of the [FastAPI](https://github.com/fastapi/fastapi) source code, so results stay comparable over time.
 
-- Tag: `<TAG>`
-- Commit: `<SHA>`
+- Tag: `<0.143.0>`
+- Commit: `<0.143.0>`
 
 ## Project structure
 
