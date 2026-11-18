@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # Target repository, pinned so evaluation results stay comparable.
     fastapi_repo_path: Path = Path("data/repos/fastapi")
     fastapi_tag: str = "0.143.0"
-    fastapi_sha: str = "0.143.0"
+    fastapi_sha: str = "f5c6e9b4f9cadc1bf0f9a1fd672e621206b63007"
 
 
 def require(value: SecretStr | None, env_name: str) -> str:

@@ -14,7 +14,7 @@
 ## Kararlar
 - API anahtarları zorunlu değil; sadece gerektiği yerde `require` ile kontrol ediliyor.
 - `.env` içinde boş bırakılan anahtarlar "yok" sayılıyor.
-- FastAPI tag: 0.143.0 / SHA: 0.143.0
+- FastAPI tag: 0.143.0 / SHA: f5c6e9b4f9cadc1bf0f9a1fd672e621206b63007
 
 ## Doğrulama
 (`uv run rag --help` ve `uv run pytest -v` çıktılarını buraya yapıştır)

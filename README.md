@@ -83,8 +83,8 @@ uv run pytest
 
 Development and evaluation run against a pinned version of the [FastAPI](https://github.com/fastapi/fastapi) source code, so results stay comparable over time.
 
-- Tag: `<0.143.0>`
-- Commit: `<0.143.0>`
+- Tag: `0.143.0`
+- Commit: `f5c6e9b4f9cadc1bf0f9a1fd672e621206b63007`
 
 ## Project structure
 
