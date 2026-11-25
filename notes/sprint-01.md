@@ -30,7 +30,8 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 | c2d) | Gerçek FastAPI klonunda doğrulama, sonuçlar notlara | `docs: record fastapi scan results` (bu commit) |
 | CLI | `rag scan [PATH]` komutu | `6f7e6a4 feat(cli): add scan command` |
 | Kabul | `git ls-files` ile tarama sonucunun karşılaştırılması | `5af79e9 docs: record scan acceptance check` |
-| Düzeltme | Symlink tespiti `os.path.islink` ile (Python 3.12 uyumu) | `fix(scan): detect symlinks with os.path.islink` (hash sonraki commit'te) |
+| Düzeltme | Symlink tespiti `os.path.islink` ile (Python 3.12 uyumu) | `ffab71b fix(scan): detect symlinks with os.path.islink` |
+| CI | GitHub Actions: Python 3.12 + 3.14 matrisi | `ci: add github actions workflow` (bu commit) |
 | Ek | Talimat dosyaları, sprint notu | `512d4e2 chore: let claude code test and commit after each step`, `1429874 docs: add sprint 01 notes` |
 
 ## Kararlar ve gerekçeleri
@@ -95,6 +96,13 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 - Hatalı kök (yok, dizin değil, listelenemiyor) tek satır `Error: ...` ile **çıkış kodu 2** (yanlış kullanım); `index/search/ask` taslaklarının kodu 1 olarak kaldı.
 - Testlerde ortam değişkenleri (`MAX_FILE_SIZE_BYTES`, `FASTAPI_REPO_PATH`) `.env`'den baskındır; testler geliştiricinin `.env`'ine bağımlı değil.
 
+### CI (`.github/workflows/ci.yml`)
+- Tetikleyici: her `push` ve `pull_request`. `ubuntu-latest`, matris `["3.12", "3.14"]`, `fail-fast: false` (bir sürümün hatası diğerini gizlemesin). `permissions: contents: read`.
+- Adımlar: `uv sync --locked` (kilit dosyası güncel değilse CI kırılır, bilerek), sonra CLAUDE.md'deki `python -m` biçimiyle `ruff check`, `ruff format --check`, `pytest`.
+- **`UV_PYTHON` ortam değişkeni** matris sürümünü taşır: projede `.python-version` var ve `uv run` onu matris sürümünün üstüne yazıp ortamı yeniden kurabilirdi.
+- **Klon gerektiren test yok:** testlerin hiçbiri `data/repos/fastapi`'ye ihtiyaç duymuyor (`FASTAPI_REPO_PATH` testlerde `tmp_path`'e yönlendiriliyor; `data/repos/` zaten gitignore'da). Bu yüzden atlama mekanizması eklenmedi; klona bağlı bir test eklenirse kendi kendini `skip` etmeli (workflow'da yorum olarak yazıldı).
+- Aksiyon sürümleri (`actions/checkout@v4`, `astral-sh/setup-uv@v6`) bilinen kararlı ana sürümler; güncel olup olmadıkları ağdan doğrulanmadı (`gh` kurulu değil).
+
 ### c2 için kayıtlı karar
 - **`os.walk`'un listeleyemediği klasörler `ScanResult.unreadable_dirs` alanına yazılacak.**
   Gerekçe: `os.walk` varsayılan olarak listelenemeyen alt dizinleri sessizce atlar; bu K10'daki "tek dosya okunamıyor" durumundan farklı ve sessiz kalması içeriğin eksik indekslenmesi demek. Dosya kaydı (`ExcludedFile`) üretmiyoruz çünkü içindeki dosyaları bilmiyoruz; ayrı bir alan hem özette gösterilebilir hem testlenebilir.
@@ -129,7 +137,7 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 3. ~~Gerçek repoda duman testi~~ **Bitti:** 668 dahil / 616 test / 0 dışlanan.
 4. ~~CLI özeti~~ **Bitti:** `rag scan [PATH]` (bkz. Kararlar → CLI). `index` komutuna dokunulmadı; o S10'un işi.
 5. İç içe `.gitignore`: gerekirse ölçüp sonraki iterasyona.
-6. **Python 3.12 testleri:** App Control 3.12 yorumlayıcısını engelliyor; ya ilke bu yorumlayıcıya izin verecek şekilde güncellenmeli ya da testler CI'da (ör. GitHub Actions) 3.12 ile koşturulmalı. O zamana kadar `requires-python >=3.12` iddiası doğrulanmamıştır.
+6. **Python 3.12 testleri: CI ile doğrulanacak.** App Control 3.12 yorumlayıcısını yerelde engelliyor. `.github/workflows/ci.yml` eklendi (push ve pull_request, `ubuntu-latest`, Python 3.12 ve 3.14 matrisi; `uv sync --locked`, `ruff check`, `ruff format --check`, `pytest`). **İlk yeşil CI çalışması görülene kadar `requires-python >=3.12` iddiası doğrulanmamıştır;** push yapılmadığı için workflow henüz hiç çalışmadı ve YAML'ı yerelde de ayrıştırılamadı (pyyaml kurulu değil).
 
 ## Hakimiyet soruları
 - `os.walk`'ta `dirnames[:] = kept` neden `dirnames = kept` değil?
