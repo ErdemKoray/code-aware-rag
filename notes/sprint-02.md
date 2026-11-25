@@ -1,0 +1,43 @@
+# Sprint 02 — tree-sitter ayrıştırıcı (`src/coderag/parsing/python.py`)
+
+Branch: `sprint/s02-parser` · Başlangıç: 2026-11-26
+
+## Amaç
+Python kaynağını tree-sitter ile sözdizimi ağacına çevirmek; ağaçta hata olup olmadığını bildirmek.
+S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
+
+## Kapsam
+- `tree-sitter` ve `tree-sitter-python` bağımlılıkları.
+- `parse(source: bytes)` → ağaç + `has_error` bilgisi.
+- `rag parse-debug <dosya>`: üst düzey node'ları tip ve satır aralığıyla basar.
+- Tüm FastAPI dosyaları istisnasız ayrıştırılmalı; toplam süre ve `has_error` sayısı bu nota yazılır.
+- Sözdizimi hatalı kaynak çökmeden ayrıştırılmalı ve `has_error=True` vermeli.
+- Testler: async fonksiyon, decorator'lı tanım, iç içe sınıf, hatalı kaynak.
+- `notes/tree-sitter.md`: gerçek gözlemden derlenen node tipleri ve alan adları.
+
+## Adımlar ve commit'ler
+
+| Adım | Ne yapıldı | Commit |
+|---|---|---|
+| Hazırlık | README'ye CI rozeti | `7ae1371 docs: add ci badge to readme` |
+| Hazırlık | Sprint 02 başlangıcı (`CLAUDE.md` sprint satırı, bu not) | `chore: start sprint 02` (bu commit) |
+
+## Kararlar ve gerekçeleri
+
+1. **`parse()` bir `ParseResult` döndürür** (`frozen=True, slots=True`; alanlar `tree`, `source`; `has_error` bir property).
+   Gerekçe: `has_error` zaten `tree.root_node.has_error`'dan türer, ayrı alan olarak saklamak tutarsızlık riski yaratır. `source` S03'te node metnini çıkarmak için taşınır. Anlam: tree-sitter'da `has_error`, hem `ERROR` hem `MISSING` node'larını sayar.
+2. **Satır aralığı yardımcısı 1 tabanlı ve kapsayıcı** (`(başlangıç, bitiş)`). tree-sitter 0 tabanlı satır verir.
+   Ek koşul: node bir sonraki satırın 0. sütununda bitiyorsa bitiş satırı bir fazla gösterilmez (bu sınır durumu testlidir). Gerekçe: ileride tüm `dosya:satır` atıfları bu yardımcıya dayanacak.
+3. **Hatalı fixture'lar testlerde satır içi `bytes`**, `.py` dosyası değil. Gerekçe: hatalı bir `.py` dosyası `ruff check` ve `ruff format --check`'i, yani CI'ı kırar.
+4. **"Tüm FastAPI dosyaları" iki küme:** (a) scan'in 668 dahil dosyası, (b) `git ls-files "*.py"` ile 1167 dosyanın tamamı (`docs_src/`, `scripts/` dahil). Sayılar ayrı raporlanır.
+   Doğrulama **kalıcı bir test** olur; klon yoksa kendini `skip` eder (CI'da klon yok). Süre yalnızca bu notta tutulur, testte değil.
+5. **`parse-debug` çıktısı:** üst düzey adlandırılmış node'lar (yorumlar dahil, anonim jetonlar hariç); satır aralığı ASCII tireyle (`L12-30`); üstte `has_error` satırı; fonksiyon ve sınıflarda `name=...`; dosya yoksa çıkış kodu 2; `has_error` olan dosyada çıkış kodu 0 (araç hatayı raporlar, hüküm vermez).
+6. **Parser yaşam döngüsü:** `Language` modül yüklenirken bir kez, `Parser` her çağrıda yeni oluşturulur (Parser iş parçacığı güvenli değil; HTTP API sprint'inde sorun çıkmasın).
+7. **Kodlama sınırı:** girdi `bytes`, tree-sitter UTF-8 varsayar. `coding:` bildirimiyle başka kodlama kullanan dosya çıkarsa burada belirtilir.
+8. **Sürümler** `uv add`'in seçtiği güncel sürümler; sabitlemeyi `uv.lock` yapar.
+
+## Doğrulama
+(her adımdan sonra güncellenir)
+
+## Açık işler
+- Adımlar tablosundaki parser, `parse-debug`, toplu doğrulama ve `notes/tree-sitter.md` işleri.
