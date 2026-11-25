@@ -1,16 +1,28 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
+    "allow": [
+      "PowerShell(uv run python -m pytest*)",
+      "PowerShell(uv run python -m ruff*)",
+      "PowerShell(git add *)",
+      "PowerShell(git commit *)",
+      "Bash(uv run python -m pytest*)",
+      "Bash(uv run python -m ruff*)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ],
+    "ask": [
+      "PowerShell(git push *)",
+      "PowerShell(git tag *)",
+      "PowerShell(git merge *)",
+      "Bash(git push *)",
+      "Bash(git tag *)",
+      "Bash(git merge *)"
+    ],
     "deny": [
       "Read(./.env)",
       "Edit(./.env)",
       "Edit(./data/repos/**)"
-    ],
-    "ask": [
-      "Bash(git commit *)",
-      "Bash(git push *)",
-      "Bash(git tag *)",
-      "Bash(git merge *)"
     ]
   }
 }

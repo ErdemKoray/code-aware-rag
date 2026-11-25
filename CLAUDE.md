@@ -29,7 +29,7 @@ The owner wants to understand every line. Follow these rules strictly:
 ## Hard rules
 - Never modify anything under `data/repos/`. It is the pinned target repository; evaluation depends on it.
 - Never read or print `.env`. Settings come from `coderag.config.Settings`.
-- Never commit, push, tag or merge unless asked. Suggest the commit message instead.
+- You may commit after tests and ruff pass. Never push, tag or merge unless asked.
 
 ## Conventions
 - Layout: `src/coderag/`, tests in `tests/`.
@@ -39,12 +39,11 @@ The owner wants to understand every line. Follow these rules strictly:
 - Type hints everywhere. Every new behavior gets a test.
 
 ## Working mode
-The owner supervises and reviews; you write the code. Keep every change reviewable:
-- Before any edit, state the plan in a few lines and wait for approval.
-- One small step at a time: one class, one function or one file per diff.
-- After each edit, explain in Turkish what changed and why, pointing out
-  non-obvious lines and design decisions.
-- Every new behavior gets a test in the same step.
-- After each step, run tests and ruff and report the results.
-- If the owner asks "why", answer before continuing.
+You write, test and commit; the owner reviews at the end of each sprint.
+- Work in small steps: one class, one function or one file per step.
+- After each step: run `uv run python -m pytest` and `uv run python -m ruff check .`.
+  If both pass, commit with a Conventional Commit message and continue.
+- Stop and ask only for: design decisions not covered by earlier answers,
+  failing tests you cannot fix, or anything that changes the project's scope.
+- Keep a running log in `notes/sprint-XX.md`: each step, its commit, and every decision with its reason.
 - Reply to the owner in Turkish. Code, identifiers, comments, CLI output and commit messages in English.
