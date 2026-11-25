@@ -25,7 +25,8 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
 | Hazırlık | CI aksiyonları Node 24'e yükseltildi, Dependabot eklendi | `7480e2b ci: upgrade actions to node24 and enable dependabot` |
 | 1 | `tree-sitter` 0.27.0 ve `tree-sitter-python` 0.25.0 eklendi | `983c782 chore(deps): add tree-sitter and tree-sitter-python` |
 | 2 | `parsing/python.py`: `parse()`, `ParseResult`, `line_range()` + 31 test | `663a8be feat(parsing): add python parser` |
-| 3 | `rag parse-debug <dosya>` + 9 test | `feat(cli): add parse-debug command` (hash sonraki commit'te) |
+| 3 | `rag parse-debug <dosya>` + 9 test | `d4d7378 feat(cli): add parse-debug command` |
+| 4 | Tüm FastAPI dosyalarının ayrıştırılması: kalıcı test (klon yoksa `skip`) + sayılar | `test(parsing): parse every fastapi file` (hash sonraki commit'te) |
 
 ## Kararlar ve gerekçeleri
 
@@ -56,7 +57,18 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
   - `class A:\n` ve `def f():\n` (gövdesiz) `has_error=False` veriyor: gramer bunları hata saymıyor. Chunker bunu bilmeli.
 - **`line_range` sınır durumu gerçek veride var:** kök `module` her zaman son satırdan sonra 0. sütunda biter; ayrıca FastAPI'de (1167 dosya) kök dışı **29 node** bir sonraki satırın 0. sütununda bitiyor ve hepsi `string_content` (kapanış `"""` satır başındaki docstring'lerin içeriği). `line_continuation` (`\` ile satır devamı) de aynı biçimde biter. Kural uygulanınca `string_content` 1-2, ait olduğu `string` 1-3 satırı verir.
 - **`parse-debug` (adım 3):** çıktı biçimi: ilk satır `has_error: True|False`; sonra üst düzey adlandırılmış node başına bir satır: `tip  Lx-y` (+ `  name=...`), tip sütunu en uzun tipe göre hizalı; boş dosyada `(no top-level nodes)`. `decorated_definition` için `name=`, sardığı fonksiyon/sınıfın adını gösterir (sahip talimatı: "fonksiyon ve sınıflarda"). Hatalı dosyada çıkış kodu 0, okunamayan dosya/dizinde `Error: cannot read ...` ve çıkış kodu 2. Çıktı ASCII (`isascii` testli). Gerçek dosyada (`fastapi/params.py`) elle denendi.
-- `uv run python -m pytest`: **148 geçti** (108 eski + 31 ayrıştırıcı + 9 CLI).
+- **Toplu doğrulama: tüm FastAPI dosyaları (adım 4)** (`data/repos/fastapi` 0.143.0 sabit sürümü, 2026-11-26; ölçüm betiği scratchpad'de, repoya girmedi). Dosyalar belleğe önceden okundu; süre **yalnızca `parse()`** çağrılarının toplamı, 3 çalıştırma, ortanca verildi:
+
+  | Küme | Dosya | Boyut | `parse()` süresi (3 çalıştırma) | Ortanca | İstisna | `has_error` |
+  |---|---|---|---|---|---|---|
+  | (a) scan'in dahil dosyaları | 668 | 3 806 063 bayt | 0.452 / 0.434 / 0.444 sn | **0.444 sn** | **0** | **0** |
+  | (b) `git ls-files "*.py"` (tamamı, `docs_src/` ve `scripts/` dahil) | 1167 | 4 168 417 bayt | 0.491 / 0.461 / 0.457 sn | **0.461 sn** | **0** | **0** |
+
+  - Hiçbir dosyada `ERROR` ya da `MISSING` node'u yok; yani gramer FastAPI 0.143.0'ın bütün yazımını (3.10+ sözdizimi örnekleri dahil) tanıyor.
+  - (b)'de fazladan 499 dosya (`docs_src/`, `scripts/`) yalnızca ~17 ms ekliyor: bunlar küçük dosyalar (≈360 KB toplam). Ayrıştırma hızı kabaca 8-9 MB/sn; indeksleme hattında ayrıştırma darboğaz olmayacak.
+  - Kalıcı test `tests/test_parsing_fastapi.py` iki kümeyi de ayrı ayrı sınar ve `has_error == 0` ister. Klon (`Settings().fastapi_repo_path`) yoksa kendini `skip` eder: yerelde klon gizlenerek 2 skip doğrulandı, CI'da klon olmadığı için atlanacak (S01'de konuşulan "klon gerektiren test kendini atlasın" kuralının ilk kullanımı).
+  - Sürüm kayması riski: `tree-sitter-python` güncellenirse (yeni gramer) bu test hata sayısını yakalayan ilk alarm olur.
+- `uv run python -m pytest`: **150 geçti** yerelde (108 eski + 31 ayrıştırıcı + 9 CLI + 2 toplu FastAPI testi); CI'da klon olmadığı için 148 geçer, 2 atlanır.
 
 ## Açık işler
 - Adımlar tablosundaki parser, `parse-debug`, toplu doğrulama ve `notes/tree-sitter.md` işleri.
