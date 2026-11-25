@@ -28,6 +28,7 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 | c2b) | `SYMLINK` ve `GITIGNORED` kontrolleri (`_classify_file`) | `b6149d5 feat(scan): exclude symlinks and gitignored files` |
 | c2c) | `TOO_LARGE` ve `UNREADABLE` (dosya) kontrolleri, öncelik testleri | `89140dc feat(scan): exclude oversized and unreadable files` |
 | c2d) | Gerçek FastAPI klonunda doğrulama, sonuçlar notlara | `docs: record fastapi scan results` (bu commit) |
+| CLI | `rag scan [PATH]` komutu | `feat(cli): add scan command` (hash sonraki commit'te) |
 | Ek | Talimat dosyaları, sprint notu | `512d4e2 chore: let claude code test and commit after each step`, `1429874 docs: add sprint 01 notes` |
 
 ## Kararlar ve gerekçeleri
@@ -84,6 +85,14 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 - **Windows junction sınırı:** `os.walk` junction'ları symlink saymayabilir; kodda yorum olarak belirtildi, ayrıca ele alınmayacak (FastAPI klonunda beklenmiyor).
 - **Python sürümü `>=3.12`:** `uv` ve ruff hedefi 3.12'ye çekildi. Ruff formatter parantezsiz `except A, B:` yazımını 3.14 hedefinde kendisi üretiyor ama 3.12 hedefinde geri çevirmiyor; satır elle `except (OSError, NotImplementedError):` yapıldı (parantezsiz yazım 3.12'de sözdizimi hatası).
 
+### CLI (`rag scan [PATH]`)
+- `PATH` verilmezse `Settings.fastapi_repo_path`; eşik her zaman `Settings.max_file_size_bytes`.
+- Çıktı: dahil (ve test) sayısı, dışlanan toplamı, **gerekçe başına sayılar sıfırlar dahil**, `pruned_dirs`, `unreadable_dirs`, en büyük 5 dosya, tarama süresi.
+- **KB = 1000 bayt** (eşik 500_000 bayt = 500 KB ile tutarlı); bir ondalık basamak.
+- Biçimlendirme `format_scan_report` ayrı bir saf fonksiyon (hesap `ScanResult`'ta, burada yalnızca metin); süre komutta `perf_counter` ile ölçülür ve fonksiyona verilir, böylece testlenebilir.
+- Hatalı kök (yok, dizin değil, listelenemiyor) tek satır `Error: ...` ile **çıkış kodu 2** (yanlış kullanım); `index/search/ask` taslaklarının kodu 1 olarak kaldı.
+- Testlerde ortam değişkenleri (`MAX_FILE_SIZE_BYTES`, `FASTAPI_REPO_PATH`) `.env`'den baskındır; testler geliştiricinin `.env`'ine bağımlı değil.
+
 ### c2 için kayıtlı karar
 - **`os.walk`'un listeleyemediği klasörler `ScanResult.unreadable_dirs` alanına yazılacak.**
   Gerekçe: `os.walk` varsayılan olarak listelenemeyen alt dizinleri sessizce atlar; bu K10'daki "tek dosya okunamıyor" durumundan farklı ve sessiz kalması içeriğin eksik indekslenmesi demek. Dosya kaydı (`ExcludedFile`) üretmiyoruz çünkü içindeki dosyaları bilmiyoruz; ayrı bir alan hem özette gösterilebilir hem testlenebilir.
@@ -91,7 +100,7 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
   Kenar durum kararı: **kökün kendisi listelenemezse** `OSError` yukarı çıkar (K10 ile aynı mantık: erişilemeyen kök çağıran tarafın sorunu, "eksik ama devam" sayılmaz). Testte `os.scandir` `monkeypatch` ile `PermissionError` fırlatacak şekilde değiştirilir (Windows'ta izin kaldırmak güvenilir değil).
 
 ## Doğrulama
-- `uv run python -m pytest`: **100 passed, 0 skipped** (c2 sonrası, 2026-11-25).
+- `uv run python -m pytest`: **108 passed, 0 skipped** (`rag scan` sonrası, 2026-11-25).
 - `uv run python -m ruff check .` ve `uv run python -m ruff format --check .`: temiz.
 - **Symlink testi:** `test_scan_does_not_follow_directory_symlinks` ilk çalıştırmada bu makinede atlanmıştı (link oluşturulamadı). Geliştirici Modu açıldıktan sonra atlanmadan çalıştı ve geçti: klasör linkleri gezilmiyor ve kayıt üretmiyor (K8 madde 6).
 - **Gerçek repo duman testi** (`data/repos/fastapi`, `Settings().max_file_size_bytes = 500_000`, 2026-11-25; betik scratchpad'de, repoya girmedi):
@@ -109,7 +118,7 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 1. ~~c2 (dışlama kuralları, `unreadable_dirs`)~~ **Bitti** (c2a–c2c).
 2. ~~Eşiği veriyle doğrula~~ **Bitti:** çekirdek dosyalar 500 KB'ın çok altında (bkz. Doğrulama).
 3. ~~Gerçek repoda duman testi~~ **Bitti:** 668 dahil / 616 test / 0 dışlanan.
-4. **CLI özeti:** `index` komutunda tarama özeti (gerekçe sayıları, `pruned_dirs`, `unreadable_dirs`, en büyük 5 dosya).
+4. ~~CLI özeti~~ **Bitti:** `rag scan [PATH]` (bkz. Kararlar → CLI). `index` komutuna dokunulmadı; o S10'un işi.
 5. İç içe `.gitignore`: gerekirse ölçüp sonraki iterasyona.
 6. **Python 3.12 testleri:** App Control 3.12 yorumlayıcısını engelliyor; ya ilke bu yorumlayıcıya izin verecek şekilde güncellenmeli ya da testler CI'da (ör. GitHub Actions) 3.12 ile koşturulmalı. O zamana kadar `requires-python >=3.12` iddiası doğrulanmamıştır.
 
