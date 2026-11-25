@@ -492,7 +492,7 @@ def test_scan_does_not_follow_directory_symlinks(tmp_path):
     touch(tmp_path, "real/mod.py")
     try:
         os.symlink(tmp_path / "real", tmp_path / "link", target_is_directory=True)
-    except OSError, NotImplementedError:
+    except (OSError, NotImplementedError):
         pytest.skip("cannot create symlinks in this environment")
 
     result = scan(tmp_path, MAX_SIZE)

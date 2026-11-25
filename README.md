@@ -33,7 +33,7 @@ Question ──► Hybrid search ──► Rerank ──► Graph expansion
 
 | Layer | Choice |
 |---|---|
-| Language & tooling | Python 3.11+, uv, ruff, pytest |
+| Language & tooling | Python 3.12+, uv, ruff, pytest |
 | Parsing | tree-sitter |
 | Embeddings & reranking | Voyage AI |
 | Vector store | Qdrant |
@@ -54,7 +54,7 @@ Question ──► Hybrid search ──► Rerank ──► Graph expansion
 
 ## Getting started
 
-Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/), git.
+Requirements: Python 3.12+, [uv](https://docs.astral.sh/uv/), git.
 
 ```bash
 git clone https://github.com/<your-username>/code-aware-rag
