@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from coderag.cli import app, format_scan_report
+from coderag.cli import app, format_parse_debug, format_scan_report
+from coderag.parsing.python import parse
 from coderag.scan import ExcludedFile, ExclusionReason, IncludedFile, ScanResult
 
 runner = CliRunner()
@@ -13,7 +14,7 @@ def test_help_lists_all_commands():
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    for command in ("index", "search", "ask", "scan"):
+    for command in ("index", "search", "ask", "scan", "parse-debug"):
         assert command in result.output
 
 
@@ -105,6 +106,116 @@ def test_scan_command_file_path_fails(tmp_path):
 
     assert result.exit_code == 2
     assert "not a directory" in result.output
+
+
+# --- parse-debug command ---------------------------------------------------
+
+SAMPLE = (
+    b"# header comment\n"
+    b"import os\n"
+    b"\n"
+    b"async def fetch():\n"
+    b"    return 1\n"
+    b"\n"
+    b"@decorator\n"
+    b"@other\n"
+    b"class Outer:\n"
+    b"    class Inner:\n"
+    b"        pass\n"
+)
+
+
+def node_lines(output: str) -> list[list[str]]:
+    """Split every line after the has_error line into whitespace separated tokens."""
+    return [line.split() for line in output.splitlines()[1:]]
+
+
+def test_parse_debug_prints_has_error_first_then_top_level_nodes(tmp_path):
+    source_file = tmp_path / "sample.py"
+    source_file.write_bytes(SAMPLE)
+
+    result = runner.invoke(app, ["parse-debug", str(source_file)])
+
+    assert result.exit_code == 0
+    assert result.output.splitlines()[0] == "has_error: False"
+    assert node_lines(result.output) == [
+        ["comment", "L1-1"],
+        ["import_statement", "L2-2"],
+        ["function_definition", "L4-5", "name=fetch"],
+        ["decorated_definition", "L7-11", "name=Outer"],
+    ]
+
+
+def test_parse_debug_uses_one_based_inclusive_ranges_with_ascii_dash(tmp_path):
+    source_file = tmp_path / "one.py"
+    source_file.write_bytes(b"def f():\n    pass\n")
+
+    result = runner.invoke(app, ["parse-debug", str(source_file)])
+
+    assert "L1-2" in result.output
+    assert result.output.isascii()
+
+
+def test_parse_debug_reports_syntax_errors_with_exit_code_zero(tmp_path):
+    source_file = tmp_path / "broken.py"
+    source_file.write_bytes(b"def f(:\n    pass\n\nclass B:\n    x = 1\n")
+
+    result = runner.invoke(app, ["parse-debug", str(source_file)])
+
+    assert result.exit_code == 0
+    assert result.output.splitlines()[0] == "has_error: True"
+    assert node_lines(result.output) == [
+        ["function_definition", "L1-2", "name=f"],
+        ["class_definition", "L4-5", "name=B"],
+    ]
+
+
+def test_parse_debug_empty_file(tmp_path):
+    source_file = tmp_path / "empty.py"
+    source_file.write_bytes(b"")
+
+    result = runner.invoke(app, ["parse-debug", str(source_file)])
+
+    assert result.exit_code == 0
+    assert result.output.splitlines() == ["has_error: False", "(no top-level nodes)"]
+
+
+def test_parse_debug_missing_file_exits_with_code_two(tmp_path):
+    result = runner.invoke(app, ["parse-debug", str(tmp_path / "nope.py")])
+
+    assert result.exit_code == 2
+    assert "Error: cannot read" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_parse_debug_directory_exits_with_code_two(tmp_path):
+    result = runner.invoke(app, ["parse-debug", str(tmp_path)])
+
+    assert result.exit_code == 2
+    assert "Error: cannot read" in result.output
+
+
+def test_parse_debug_requires_a_path():
+    result = runner.invoke(app, ["parse-debug"])
+
+    assert result.exit_code == 2
+
+
+def test_format_parse_debug_names_only_functions_and_classes():
+    report = format_parse_debug(parse(b"x = 1\ndef f(): ...\nclass C: ...\n"))
+
+    assert node_lines(report) == [
+        ["expression_statement", "L1-1"],
+        ["function_definition", "L2-2", "name=f"],
+        ["class_definition", "L3-3", "name=C"],
+    ]
+
+
+def test_format_parse_debug_aligns_columns_to_the_longest_type():
+    report = format_parse_debug(parse(b"x = 1\ndef f(): ...\n"))
+
+    first, second = report.splitlines()[1:]
+    assert first.index("L1-1") == second.index("L2-2")
 
 
 # --- format_scan_report ----------------------------------------------------

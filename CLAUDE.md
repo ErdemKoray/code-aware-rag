@@ -1,7 +1,7 @@
 # Code-Aware RAG
 
 AST-based RAG over Python repositories. Target repo: pinned FastAPI under `data/repos/fastapi`.
-Current sprint: **S01 — File scanner**. Sprint notes live in `notes/`.
+Current sprint: **S02 — tree-sitter parser**. Sprint notes live in `notes/`.
 
 ## This is a learning project
 The owner wants to understand every line. Follow these rules strictly:

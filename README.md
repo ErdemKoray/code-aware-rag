@@ -1,5 +1,7 @@
 # Code-Aware RAG
 
+[![CI](https://github.com/ErdemKoray/code-aware-rag/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ErdemKoray/code-aware-rag/actions/workflows/ci.yml)
+
 A retrieval-augmented generation system that answers questions about a Python codebase with precise `file:line` citations.
 
 > **Status:** Early development. The project skeleton is in place; the indexing and retrieval pipeline is being built sprint by sprint.

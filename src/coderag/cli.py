@@ -3,8 +3,10 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from tree_sitter import Node
 
 from coderag.config import Settings
+from coderag.parsing.python import ParseResult, line_range, parse
 from coderag.scan import ScanResult, scan
 
 app = typer.Typer(
@@ -56,6 +58,51 @@ def scan_command(
         raise typer.Exit(code=2) from error
     elapsed = time.perf_counter() - started
     typer.echo(format_scan_report(result, settings.max_file_size_bytes, elapsed))
+
+
+def _definition_name(node: Node, source: bytes) -> str | None:
+    """Name of a function or class; a decorated definition reports the name it wraps."""
+    if node.type == "decorated_definition":
+        definition = node.child_by_field_name("definition")
+        if definition is None:
+            return None
+        node = definition
+    if node.type not in ("function_definition", "class_definition"):
+        return None
+    name = node.child_by_field_name("name")
+    if name is None:
+        return None
+    return source[name.start_byte : name.end_byte].decode("utf-8", errors="replace")
+
+
+def format_parse_debug(result: ParseResult) -> str:
+    """Render the top-level named nodes of a parse as one line each, after a has_error line."""
+    lines = [f"has_error: {result.has_error}"]
+    nodes = result.tree.root_node.named_children
+    if not nodes:
+        lines.append("(no top-level nodes)")
+    width = max((len(node.type) for node in nodes), default=0)
+    for node in nodes:
+        first, last = line_range(node)
+        line = f"{node.type:<{width}}  L{first}-{last}"
+        name = _definition_name(node, result.source)
+        if name is not None:
+            line += f"  name={name}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+@app.command("parse-debug")
+def parse_debug(path: Annotated[Path, typer.Argument(help="Python file to parse.")]) -> None:
+    """Print the top-level syntax nodes of a Python file with their line ranges."""
+    try:
+        source = path.read_bytes()
+    except OSError as error:
+        typer.echo(f"Error: cannot read {path}: {error.strerror or error}", err=True)
+        raise typer.Exit(code=2) from error
+    # A file with syntax errors is still reported (exit code 0): this tool describes, it
+    # does not judge.
+    typer.echo(format_parse_debug(parse(source)))
 
 
 @app.command()
