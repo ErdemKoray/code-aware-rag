@@ -21,7 +21,8 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
 |---|---|---|
 | Hazırlık | README'ye CI rozeti | `7ae1371 docs: add ci badge to readme` |
 | Hazırlık | Sprint 02 başlangıcı (`CLAUDE.md` sprint satırı, bu not) | `6b7e9c3 chore: start sprint 02` |
-| Hazırlık | S01 notunda Python 3.12 maddesi kapatıldı (CI'da 3.12 ve 3.14 yeşil) | `docs: close sprint 01 python 3.12 item` (hash sonraki commit'te) |
+| Hazırlık | S01 notunda Python 3.12 maddesi kapatıldı (CI'da 3.12 ve 3.14 yeşil) | `c203d99 docs: close sprint 01 python 3.12 item` |
+| Hazırlık | CI aksiyonları Node 24'e yükseltildi, Dependabot eklendi | `ci: upgrade actions to node24 and enable dependabot` (hash sonraki commit'te) |
 
 ## Kararlar ve gerekçeleri
 
@@ -36,6 +37,11 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
 6. **Parser yaşam döngüsü:** `Language` modül yüklenirken bir kez, `Parser` her çağrıda yeni oluşturulur (Parser iş parçacığı güvenli değil; HTTP API sprint'inde sorun çıkmasın).
 7. **Kodlama sınırı:** girdi `bytes`, tree-sitter UTF-8 varsayar. `coding:` bildirimiyle başka kodlama kullanan dosya çıkarsa burada belirtilir.
 8. **Sürümler** `uv add`'in seçtiği güncel sürümler; sabitlemeyi `uv.lock` yapar.
+
+### CI bakımı
+- S01'deki CI çalışmasında Node.js 20 uyarısı çıktı. `actions/checkout` `v4` → `v6`, `astral-sh/setup-uv` `v6` → `v7` (Node 24 çalışma zamanı); sürümler sahibinin talimatıyla seçildi, ağdan ben doğrulamadım (`gh` yok).
+- `.github/dependabot.yml`: yalnızca `github-actions` ekosistemi, kök dizin, haftalık. Python bağımlılıkları (`uv`) bilerek kapsam dışı; `uv.lock` elle güncelleniyor.
+- Workflow yerelde çalıştırılamaz; bu değişikliğin doğrulaması bu branch'in push'unda CI'ın yeşil olmasına bağlı.
 
 ## Doğrulama
 (her adımdan sonra güncellenir)
