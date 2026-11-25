@@ -8,7 +8,7 @@ Dışlanan her dosya için bir **gerekçe kodu** vermek.
 
 ## Durum
 Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budama, sıralama) bitti.
-`scan()` içindeki dışlama kuralları (symlink, gitignore, boyut, okunamaz) henüz yok: **c2 bekliyor**.
+`unreadable_dirs` (listelenemeyen klasörler) bitti. `scan()` içindeki dosya dışlama kuralları (symlink, gitignore, boyut, okunamaz) henüz yok: **c2b–c2d bekliyor**.
 
 ## Adımlar ve commit'ler
 
@@ -24,7 +24,10 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 | b) | `load_gitignore` | `3ca6a35 feat(scan): load root gitignore` |
 | c1) | `scan()` iskeleti: doğrulama, gezme, budama, `.py` filtresi, sıralama | `f2ff1d1 feat(scan): walk and prune directories` |
 | Altyapı | `requires-python` `>=3.12`, `uv.lock` ve README güncellendi | `9a2489c chore: support python 3.12 and later` |
-| c2) | Dışlama kuralları, K2 sırasıyla | **bekliyor** |
+| c2a) | `ScanResult.unreadable_dirs` + `os.walk(onerror=...)` | `feat(scan): report directories that cannot be listed` (hash c2d'de) |
+| c2b) | `SYMLINK` ve `GITIGNORED` kontrolleri | **bekliyor** |
+| c2c) | `TOO_LARGE` ve `UNREADABLE` (dosya) kontrolleri, öncelik testleri | **bekliyor** |
+| c2d) | Gerçek FastAPI klonunda doğrulama, sonuçlar notlara | **bekliyor** |
 
 ## Kararlar ve gerekçeleri
 
@@ -81,10 +84,11 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 ### c2 için kayıtlı karar
 - **`os.walk`'un listeleyemediği klasörler `ScanResult.unreadable_dirs` alanına yazılacak.**
   Gerekçe: `os.walk` varsayılan olarak listelenemeyen alt dizinleri sessizce atlar; bu K10'daki "tek dosya okunamıyor" durumundan farklı ve sessiz kalması içeriğin eksik indekslenmesi demek. Dosya kaydı (`ExcludedFile`) üretmiyoruz çünkü içindeki dosyaları bilmiyoruz; ayrı bir alan hem özette gösterilebilir hem testlenebilir.
-  Beklenen biçim: `pruned_dirs` gibi göreli, `/` ayraçlı, sıralı `tuple[str, ...]`; `os.walk(onerror=...)` ile toplanır. Bu, `ScanResult`'a yeni alan ekler: model testleri ve `make_result` yardımcısı güncellenecek.
+  Biçim: `pruned_dirs` gibi göreli, `/` ayraçlı, sıralı `tuple[str, ...]`; `os.walk(onerror=...)` ile toplanır. **Uygulandı (c2a).** Alan zorunlu (varsayılansız): yeni bir `ScanResult` kuran herkes bunu bilerek vermeli; test yardımcısı `make_result` güncellendi.
+  Kenar durum kararı: **kökün kendisi listelenemezse** `OSError` yukarı çıkar (K10 ile aynı mantık: erişilemeyen kök çağıran tarafın sorunu, "eksik ama devam" sayılmaz). Testte `os.scandir` `monkeypatch` ile `PermissionError` fırlatacak şekilde değiştirilir (Windows'ta izin kaldırmak güvenilir değil).
 
 ## Doğrulama
-- `uv run python -m pytest`: **81 passed, 0 skipped** (2026-11-25).
+- `uv run python -m pytest`: **84 passed, 0 skipped** (c2a sonrası, 2026-11-25).
 - `uv run python -m ruff check .` ve `uv run python -m ruff format --check .`: temiz.
 - **Symlink testi:** `test_scan_does_not_follow_directory_symlinks` ilk çalıştırmada bu makinede atlanmıştı (link oluşturulamadı). Geliştirici Modu açıldıktan sonra atlanmadan çalıştı ve geçti: klasör linkleri gezilmiyor ve kayıt üretmiyor (K8 madde 6).
 - **Python 3.12 ile test: ÇALIŞTIRILAMADI.** `uv run --python 3.12 python -m pytest` için uv CPython 3.12.15'i indirdi ama Windows Uygulama Denetimi yorumlayıcıyı engelledi (`os error 4551`, `Failed to spawn: python`). CLAUDE.md ilkeyi başka yolla aşmayı yasakladığı için denenmedi. Proje `.venv`'inin bozulmaması için deneme ayrı bir ortam dizininde yapıldı; `.venv` ve `uv.lock` değişmedi.

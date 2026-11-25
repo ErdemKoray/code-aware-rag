@@ -67,6 +67,8 @@ class ScanResult:
     included: tuple[IncludedFile, ...]
     excluded: tuple[ExcludedFile, ...]
     pruned_dirs: tuple[str, ...]  # relative to the repo root, "/" separated
+    # Directories os.walk could not list; their contents are missing from the result.
+    unreadable_dirs: tuple[str, ...]  # relative to the repo root, "/" separated
 
     @property
     def test_count(self) -> int:
@@ -143,10 +145,18 @@ def scan(root: Path, max_file_size_bytes: int) -> ScanResult:
 
     included: list[IncludedFile] = []
     pruned_dirs: list[str] = []
+    unreadable_dirs: list[str] = []
+
+    def record_unlistable(error: OSError) -> None:
+        # os.walk silently skips directories it cannot list unless we ask to hear about it.
+        failed = Path(error.filename) if error.filename is not None else None
+        if failed is None or failed == root:
+            raise error  # an unlistable root is a caller problem, like a missing root
+        unreadable_dirs.append(failed.relative_to(root).as_posix())
 
     # followlinks=False: symlinked directories are listed but never entered.
     # Known limit: Windows junctions are not reported as symlinks, so they may be followed.
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+    for dirpath, dirnames, filenames in os.walk(root, onerror=record_unlistable, followlinks=False):
         current = Path(dirpath)
 
         kept: list[str] = []
@@ -174,9 +184,11 @@ def scan(root: Path, max_file_size_bytes: int) -> ScanResult:
     # Sort on the "/" separated string, not on walk order, so results are deterministic.
     included.sort(key=lambda file: file.path)
     pruned_dirs.sort()
+    unreadable_dirs.sort()
     return ScanResult(
         root=root,
         included=tuple(included),
         excluded=(),
         pruned_dirs=tuple(pruned_dirs),
+        unreadable_dirs=tuple(unreadable_dirs),
     )

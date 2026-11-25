@@ -25,6 +25,7 @@ def make_result(
         included=included,
         excluded=excluded,
         pruned_dirs=(),
+        unreadable_dirs=(),
     )
 
 
@@ -499,3 +500,49 @@ def test_scan_does_not_follow_directory_symlinks(tmp_path):
 
     assert [file.path for file in result.included] == ["real/mod.py"]
     assert result.excluded == ()
+
+
+# --- scan: directories that cannot be listed -------------------------------
+
+
+def block_listing(monkeypatch, *blocked: Path) -> None:
+    """Make os.scandir fail with PermissionError for the given directories.
+
+    Removing permissions is not reliable on Windows, so the failure is simulated.
+    """
+    real_scandir = os.scandir
+
+    def fake_scandir(path="."):
+        if Path(path) in blocked:
+            raise PermissionError(13, "Access is denied", os.fspath(path))
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", fake_scandir)
+
+
+def test_scan_reports_directories_it_cannot_list(tmp_path, monkeypatch):
+    touch(tmp_path, "a.py")
+    touch(tmp_path, "pkg/ok.py")
+    touch(tmp_path, "pkg/locked/hidden.py")
+    touch(tmp_path, "zzz/locked/hidden.py")
+    block_listing(monkeypatch, tmp_path / "pkg" / "locked", tmp_path / "zzz" / "locked")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert [file.path for file in result.included] == ["a.py", "pkg/ok.py"]
+    assert result.unreadable_dirs == ("pkg/locked", "zzz/locked")
+    assert result.excluded == ()
+
+
+def test_scan_without_listing_problems_has_no_unreadable_dirs(tmp_path):
+    touch(tmp_path, "a.py")
+
+    assert scan(tmp_path, MAX_SIZE).unreadable_dirs == ()
+
+
+def test_scan_raises_when_root_cannot_be_listed(tmp_path, monkeypatch):
+    touch(tmp_path, "a.py")
+    block_listing(monkeypatch, tmp_path)
+
+    with pytest.raises(PermissionError):
+        scan(tmp_path, MAX_SIZE)
