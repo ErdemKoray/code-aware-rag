@@ -23,6 +23,10 @@ PRUNED_DIR_NAMES: frozenset[str] = frozenset(
 )
 
 
+# Directory components that mark everything below them as test code.
+TEST_DIR_NAMES: frozenset[str] = frozenset({"tests", "test"})
+
+
 class ExclusionReason(StrEnum):
     """Why a .py file was left out. Members follow the scanner's check order."""
 
@@ -89,3 +93,20 @@ class ScanResult:
         ]
         sized.sort(key=lambda pair: (-pair[1], pair[0]))
         return tuple(sized[:n])
+
+
+def is_test_path(path: str) -> bool:
+    """Tell whether a repo-relative, "/" separated path points at test code.
+
+    Directory rule: any directory component (not the file name) is in TEST_DIR_NAMES.
+    File rule: the name is conftest.py, test_*.py or *_test.py. A bare test.py is
+    not a test. Matching is case-sensitive.
+    """
+    *directories, name = path.split("/")
+    if any(part in TEST_DIR_NAMES for part in directories):
+        return True
+    return (
+        name == "conftest.py"
+        or (name.startswith("test_") and name.endswith(".py"))
+        or name.endswith("_test.py")
+    )

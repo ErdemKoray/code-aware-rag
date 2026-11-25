@@ -9,6 +9,7 @@ from coderag.scan import (
     ExclusionReason,
     IncludedFile,
     ScanResult,
+    is_test_path,
 )
 
 
@@ -239,3 +240,47 @@ def test_largest_rejects_negative_n():
 
 def test_largest_is_empty_for_empty_result():
     assert make_result().largest() == ()
+
+
+# --- is_test_path ----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "tests/x.py",
+        "test/x.py",
+        "a/test/x.py",
+        "scripts/tests/x.py",
+        "tests/deep/er/x.py",
+        "test_x.py",
+        "pkg/test_x.py",
+        "x_test.py",
+        "pkg/x_test.py",
+        "conftest.py",
+        "pkg/conftest.py",
+    ],
+)
+def test_is_test_path_detects_tests(path):
+    assert is_test_path(path) is True
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "app.py",
+        "pkg/app.py",
+        "test.py",  # a bare test.py is not a test
+        "pkg/test.py",
+        "latest.py",
+        "contest.py",
+        "x_tests.py",
+        "testing/x.py",
+        "pkg/tests.py",  # the directory rule only looks at directory components
+        "Tests/x.py",  # case-sensitive
+        "Test_x.py",
+        "test_x.pyi",
+    ],
+)
+def test_is_test_path_rejects_non_tests(path):
+    assert is_test_path(path) is False
