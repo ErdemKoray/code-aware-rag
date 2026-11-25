@@ -10,6 +10,7 @@ from coderag.scan import (
     IncludedFile,
     ScanResult,
     is_test_path,
+    load_gitignore,
 )
 
 
@@ -284,3 +285,85 @@ def test_is_test_path_detects_tests(path):
 )
 def test_is_test_path_rejects_non_tests(path):
     assert is_test_path(path) is False
+
+
+# --- load_gitignore --------------------------------------------------------
+
+
+def write_gitignore(root: Path, content: str) -> None:
+    (root / ".gitignore").write_text(content, encoding="utf-8")
+
+
+def test_load_gitignore_without_file_matches_nothing(tmp_path):
+    spec = load_gitignore(tmp_path)
+
+    assert spec.match_file("app.py") is False
+    assert spec.match_file("build/x.py") is False
+
+
+def test_load_gitignore_empty_file_matches_nothing(tmp_path):
+    write_gitignore(tmp_path, "")
+
+    assert load_gitignore(tmp_path).match_file("app.py") is False
+
+
+def test_load_gitignore_skips_comments_and_blank_lines(tmp_path):
+    write_gitignore(tmp_path, "# a comment\n\n   \nignored.py\n")
+
+    spec = load_gitignore(tmp_path)
+
+    assert spec.match_file("ignored.py") is True
+    assert spec.match_file("# a comment") is False
+    assert spec.match_file("other.py") is False
+
+
+def test_load_gitignore_glob_matches_at_any_depth(tmp_path):
+    write_gitignore(tmp_path, "*_generated.py\n")
+
+    spec = load_gitignore(tmp_path)
+
+    assert spec.match_file("a_generated.py") is True
+    assert spec.match_file("pkg/sub/a_generated.py") is True
+    assert spec.match_file("a_generated.txt") is False
+
+
+def test_load_gitignore_directory_pattern_matches_files_below(tmp_path):
+    write_gitignore(tmp_path, "build/\n")
+
+    spec = load_gitignore(tmp_path)
+
+    assert spec.match_file("build/x.py") is True
+    assert spec.match_file("build/deep/x.py") is True
+    assert spec.match_file("pkg/build/x.py") is True
+    assert spec.match_file("rebuild/x.py") is False
+
+
+def test_load_gitignore_negation_reincludes_a_file(tmp_path):
+    write_gitignore(tmp_path, "*.py\n!keep.py\n")
+
+    spec = load_gitignore(tmp_path)
+
+    assert spec.match_file("drop.py") is True
+    assert spec.match_file("keep.py") is False
+
+
+def test_load_gitignore_leading_slash_anchors_to_root(tmp_path):
+    write_gitignore(tmp_path, "/x.py\n")
+
+    spec = load_gitignore(tmp_path)
+
+    assert spec.match_file("x.py") is True
+    assert spec.match_file("a/x.py") is False
+
+
+def test_load_gitignore_reads_utf8(tmp_path):
+    write_gitignore(tmp_path, "ünï.py\n")
+
+    assert load_gitignore(tmp_path).match_file("ünï.py") is True
+
+
+def test_load_gitignore_ignores_nested_gitignore_files(tmp_path):
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / ".gitignore").write_text("x.py\n", encoding="utf-8")
+
+    assert load_gitignore(tmp_path).match_file("pkg/x.py") is False

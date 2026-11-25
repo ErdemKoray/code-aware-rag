@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from pathspec import GitIgnoreSpec
+
 # Directory names pruned during the walk; their contents are never visited.
 PRUNED_DIR_NAMES: frozenset[str] = frozenset(
     {
@@ -110,3 +112,16 @@ def is_test_path(path: str) -> bool:
         or (name.startswith("test_") and name.endswith(".py"))
         or name.endswith("_test.py")
     )
+
+
+def load_gitignore(root: Path) -> GitIgnoreSpec:
+    """Load the root .gitignore as a spec; a missing file gives an empty spec.
+
+    Only <root>/.gitignore is read: no nested .gitignore files, no
+    .git/info/exclude, no global ignore file. Other read errors propagate.
+    """
+    try:
+        text = (root / ".gitignore").read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return GitIgnoreSpec.from_lines([])
+    return GitIgnoreSpec.from_lines(text.splitlines())
