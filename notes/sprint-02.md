@@ -23,7 +23,8 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
 | Hazırlık | Sprint 02 başlangıcı (`CLAUDE.md` sprint satırı, bu not) | `6b7e9c3 chore: start sprint 02` |
 | Hazırlık | S01 notunda Python 3.12 maddesi kapatıldı (CI'da 3.12 ve 3.14 yeşil) | `c203d99 docs: close sprint 01 python 3.12 item` |
 | Hazırlık | CI aksiyonları Node 24'e yükseltildi, Dependabot eklendi | `7480e2b ci: upgrade actions to node24 and enable dependabot` |
-| 1 | `tree-sitter` 0.27.0 ve `tree-sitter-python` 0.25.0 eklendi | `chore(deps): add tree-sitter and tree-sitter-python` (hash sonraki commit'te) |
+| 1 | `tree-sitter` 0.27.0 ve `tree-sitter-python` 0.25.0 eklendi | `983c782 chore(deps): add tree-sitter and tree-sitter-python` |
+| 2 | `parsing/python.py`: `parse()`, `ParseResult`, `line_range()` + 31 test | `feat(parsing): add python parser` (hash sonraki commit'te) |
 
 ## Kararlar ve gerekçeleri
 
@@ -47,7 +48,13 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
 ## Doğrulama
 - **Bağımlılıklar (adım 1):** `uv add` sonrası import hemen denendi: `Language(tree_sitter_python.language())`, `Parser(...)`, `parse(b"def f():\n    pass\n")` → kök `module`, `has_error=False`. **Uygulama Denetimi yerel uzantıyı engellemedi.**
 - **CI için paket durumu:** `uv.lock`'ta `tree-sitter` 0.27.0 için `cp312` ve `cp314` (manylinux x86_64 dahil) hazır paketleri var; `tree-sitter-python` 0.25.0 `cp310-abi3` (tüm 3.10+ sürümlerinde çalışır). CI'ın kaynaktan derleme yapması gerekmiyor. Gerçek CI sonucu push'a bağlı, henüz görülmedi.
-- `uv run python -m pytest`: 108 geçti (bağımlılık eklemesi sonrası).
+- **Ayrıştırıcı (adım 2), gözlemlenen davranış** (varsayım değil, `parse()` çıktısından; ayrıntılar `notes/tree-sitter.md`'de toplanacak):
+  - `async def` ayrı bir node tipi **değil**: `function_definition`, ilk çocuğu anonim `async` jetonu.
+  - `decorator` bir **alan adı değil**, `decorated_definition`'ın (tekrarlanan) çocuk node tipi; alan olan `definition`. Testle sabitlendi (`child_by_field_name("decorator") is None`).
+  - Hatalı kaynak çökmeden ayrıştırılıyor: `def f(:` için ağaç yine kuruluyor (sıfır genişlikli `MISSING` `)`), sonraki `class_definition` korunuyor; `x = (1, 2` için üst düzeyde `ERROR` node'u var. `has_error` ikisinde de `True`.
+  - `class A:\n` ve `def f():\n` (gövdesiz) `has_error=False` veriyor: gramer bunları hata saymıyor. Chunker bunu bilmeli.
+- **`line_range` sınır durumu gerçek veride var:** kök `module` her zaman son satırdan sonra 0. sütunda biter; ayrıca FastAPI'de (1167 dosya) kök dışı **29 node** bir sonraki satırın 0. sütununda bitiyor ve hepsi `string_content` (kapanış `"""` satır başındaki docstring'lerin içeriği). `line_continuation` (`\` ile satır devamı) de aynı biçimde biter. Kural uygulanınca `string_content` 1-2, ait olduğu `string` 1-3 satırı verir.
+- `uv run python -m pytest`: **139 geçti** (108 eski + 31 yeni).
 
 ## Açık işler
 - Adımlar tablosundaki parser, `parse-debug`, toplu doğrulama ve `notes/tree-sitter.md` işleri.
