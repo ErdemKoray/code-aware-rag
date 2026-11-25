@@ -502,6 +502,127 @@ def test_scan_does_not_follow_directory_symlinks(tmp_path):
     assert result.excluded == ()
 
 
+# --- scan: symlink and gitignore rules -------------------------------------
+
+
+def make_symlink(link: Path, target: Path) -> None:
+    try:
+        os.symlink(target, link)
+    except (OSError, NotImplementedError):
+        pytest.skip("cannot create symlinks in this environment")
+
+
+def excluded_by_path(result: ScanResult) -> dict[str, tuple[ExclusionReason, int | None]]:
+    return {file.path: (file.reason, file.size_bytes) for file in result.excluded}
+
+
+def test_scan_excludes_file_symlinks(tmp_path):
+    touch(tmp_path, "real.py", b"x" * 10)
+    make_symlink(tmp_path / "link.py", tmp_path / "real.py")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert [file.path for file in result.included] == ["real.py"]
+    assert excluded_by_path(result) == {"link.py": (ExclusionReason.SYMLINK, None)}
+
+
+def test_scan_excludes_broken_symlinks_without_failing(tmp_path):
+    make_symlink(tmp_path / "dangling.py", tmp_path / "missing.py")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert result.included == ()
+    assert excluded_by_path(result) == {"dangling.py": (ExclusionReason.SYMLINK, None)}
+
+
+def test_scan_ignores_symlinks_that_are_not_py_files(tmp_path):
+    touch(tmp_path, "real.py")
+    make_symlink(tmp_path / "link.txt", tmp_path / "real.py")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert result.excluded == ()
+
+
+def test_scan_excludes_gitignored_files_without_measuring_them(tmp_path):
+    (tmp_path / ".gitignore").write_text("*_generated.py\n", encoding="utf-8")
+    touch(tmp_path, "app.py")
+    touch(tmp_path, "model_generated.py", b"x" * 10)
+    touch(tmp_path, "pkg/deep_generated.py")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert [file.path for file in result.included] == ["app.py"]
+    assert excluded_by_path(result) == {
+        "model_generated.py": (ExclusionReason.GITIGNORED, None),
+        "pkg/deep_generated.py": (ExclusionReason.GITIGNORED, None),
+    }
+
+
+def test_scan_does_not_prune_gitignored_directories(tmp_path):
+    # Only the fixed PRUNED_DIR_NAMES are pruned (K3); gitignored directories are
+    # walked and every file in them gets its own GITIGNORED record.
+    (tmp_path / ".gitignore").write_text("out/\n", encoding="utf-8")
+    touch(tmp_path, "out/a.py")
+    touch(tmp_path, "out/sub/b.py")
+    touch(tmp_path, "keep.py")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert [file.path for file in result.included] == ["keep.py"]
+    assert sorted(excluded_by_path(result)) == ["out/a.py", "out/sub/b.py"]
+    assert result.pruned_dirs == ()
+
+
+def test_scan_honours_gitignore_negation(tmp_path):
+    (tmp_path / ".gitignore").write_text("*.py\n!keep.py\n", encoding="utf-8")
+    touch(tmp_path, "keep.py")
+    touch(tmp_path, "drop.py")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert [file.path for file in result.included] == ["keep.py"]
+    assert excluded_by_path(result) == {"drop.py": (ExclusionReason.GITIGNORED, None)}
+
+
+def test_scan_without_gitignore_excludes_nothing(tmp_path):
+    touch(tmp_path, "a.py")
+
+    assert scan(tmp_path, MAX_SIZE).excluded == ()
+
+
+def test_scan_symlink_wins_over_gitignore(tmp_path):
+    (tmp_path / ".gitignore").write_text("*.py\n", encoding="utf-8")
+    touch(tmp_path, "real.txt")
+    make_symlink(tmp_path / "link.py", tmp_path / "real.txt")
+    touch(tmp_path, "plain.py")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert excluded_by_path(result) == {
+        "link.py": (ExclusionReason.SYMLINK, None),
+        "plain.py": (ExclusionReason.GITIGNORED, None),
+    }
+
+
+def test_scan_sorts_excluded_by_path_and_counts_reasons(tmp_path):
+    (tmp_path / ".gitignore").write_text("g*.py\n", encoding="utf-8")
+    touch(tmp_path, "z_real.py")
+    touch(tmp_path, "gb.py")
+    touch(tmp_path, "ga.py")
+    make_symlink(tmp_path / "a_link.py", tmp_path / "z_real.py")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert [file.path for file in result.excluded] == ["a_link.py", "ga.py", "gb.py"]
+    assert dict(result.exclusion_counts) == {
+        ExclusionReason.SYMLINK: 1,
+        ExclusionReason.GITIGNORED: 2,
+        ExclusionReason.TOO_LARGE: 0,
+        ExclusionReason.UNREADABLE: 0,
+    }
+
+
 # --- scan: directories that cannot be listed -------------------------------
 
 

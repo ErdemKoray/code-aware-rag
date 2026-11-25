@@ -8,7 +8,7 @@ Dışlanan her dosya için bir **gerekçe kodu** vermek.
 
 ## Durum
 Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budama, sıralama) bitti.
-`unreadable_dirs` (listelenemeyen klasörler) bitti. `scan()` içindeki dosya dışlama kuralları (symlink, gitignore, boyut, okunamaz) henüz yok: **c2b–c2d bekliyor**.
+`unreadable_dirs` (listelenemeyen klasörler), `SYMLINK` ve `GITIGNORED` kuralları bitti. Boyut ve okunamaz dosya kuralları ile gerçek repo doğrulaması bekliyor: **c2c–c2d**.
 
 ## Adımlar ve commit'ler
 
@@ -25,7 +25,7 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 | c1) | `scan()` iskeleti: doğrulama, gezme, budama, `.py` filtresi, sıralama | `f2ff1d1 feat(scan): walk and prune directories` |
 | Altyapı | `requires-python` `>=3.12`, `uv.lock` ve README güncellendi | `9a2489c chore: support python 3.12 and later` |
 | c2a) | `ScanResult.unreadable_dirs` + `os.walk(onerror=...)` | `feat(scan): report directories that cannot be listed` (hash c2d'de) |
-| c2b) | `SYMLINK` ve `GITIGNORED` kontrolleri | **bekliyor** |
+| c2b) | `SYMLINK` ve `GITIGNORED` kontrolleri (`_classify_file`) | `feat(scan): exclude symlinks and gitignored files` (hash c2d'de) |
 | c2c) | `TOO_LARGE` ve `UNREADABLE` (dosya) kontrolleri, öncelik testleri | **bekliyor** |
 | c2d) | Gerçek FastAPI klonunda doğrulama, sonuçlar notlara | **bekliyor** |
 
@@ -75,7 +75,8 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 ### Yardımcılar ve `scan()`
 
 - **`load_gitignore`:** `pathspec.GitIgnoreSpec` (git'in kenar durumlarını `gitwildmatch` fabrikasından daha doğru taklit eder). Dosya yoksa boş spec; başka okuma hataları yukarı çıkar (yapılandırma hatası). `is_gitignored` sarmalayıcısı yok, `scan()` `spec.match_file(rel)` çağıracak.
-- **Gitignore'lu klasörler budanmaz;** içindeki dosyalar tek tek `GITIGNORED` olur (K3 yalnızca sabit liste için).
+- **Gitignore'lu klasörler budanmaz;** içindeki dosyalar tek tek `GITIGNORED` olur (K3 yalnızca sabit liste için). Testle sabitlendi (c2b).
+- **Kural sırası tek yerde:** dosya başına karar `_classify_file` içinde, ilk eşleşen kazanır (K1). `SYMLINK` kontrolü `Path.is_symlink()` ile (lstat tabanlı, hedefe dokunmaz); kırık linkler çökmeden `SYMLINK` olur. `GITIGNORED` kararı boyut ölçülmeden verilir, bu yüzden `size_bytes=None`.
 - **`scan()` içinde `max_file_size_bytes <= 0` için `ValueError`** (testli). Gerekçe: `scan()` `Settings` dışında da çağrılıyor; `Settings.gt=0` yetmez.
 - **`UNREADABLE` = `stat` hatası + `open(..., "rb")` denemesi.** Gerekçe: tarayıcı içerik okumadığı için yalnızca `stat` hatası pratikte neredeyse hiç tetiklenmez; açma denemesi izin hatalarını yakalar. Testte `monkeypatch` ile `PermissionError` (Windows'ta izin kaldırarak test güvenilir değil).
 - **Windows junction sınırı:** `os.walk` junction'ları symlink saymayabilir; kodda yorum olarak belirtildi, ayrıca ele alınmayacak (FastAPI klonunda beklenmiyor).
@@ -88,7 +89,7 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
   Kenar durum kararı: **kökün kendisi listelenemezse** `OSError` yukarı çıkar (K10 ile aynı mantık: erişilemeyen kök çağıran tarafın sorunu, "eksik ama devam" sayılmaz). Testte `os.scandir` `monkeypatch` ile `PermissionError` fırlatacak şekilde değiştirilir (Windows'ta izin kaldırmak güvenilir değil).
 
 ## Doğrulama
-- `uv run python -m pytest`: **84 passed, 0 skipped** (c2a sonrası, 2026-11-25).
+- `uv run python -m pytest`: **93 passed, 0 skipped** (c2b sonrası, 2026-11-25).
 - `uv run python -m ruff check .` ve `uv run python -m ruff format --check .`: temiz.
 - **Symlink testi:** `test_scan_does_not_follow_directory_symlinks` ilk çalıştırmada bu makinede atlanmıştı (link oluşturulamadı). Geliştirici Modu açıldıktan sonra atlanmadan çalıştı ve geçti: klasör linkleri gezilmiyor ve kayıt üretmiyor (K8 madde 6).
 - **Python 3.12 ile test: ÇALIŞTIRILAMADI.** `uv run --python 3.12 python -m pytest` için uv CPython 3.12.15'i indirdi ama Windows Uygulama Denetimi yorumlayıcıyı engelledi (`os error 4551`, `Failed to spawn: python`). CLAUDE.md ilkeyi başka yolla aşmayı yasakladığı için denenmedi. Proje `.venv`'inin bozulmaması için deneme ayrı bir ortam dizininde yapıldı; `.venv` ve `uv.lock` değişmedi.

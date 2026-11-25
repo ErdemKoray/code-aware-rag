@@ -130,11 +130,31 @@ def load_gitignore(root: Path) -> GitIgnoreSpec:
     return GitIgnoreSpec.from_lines(text.splitlines())
 
 
+def _classify_file(
+    file_path: Path, relative: str, gitignore: GitIgnoreSpec
+) -> IncludedFile | ExcludedFile:
+    """Decide the fate of one .py file; the first matching rule wins (K1, K2).
+
+    Work in progress: symlink and gitignore rules are applied; the size and
+    readability checks come next.
+    """
+    # is_symlink() looks at the link itself (lstat), so the target is never touched.
+    if file_path.is_symlink():
+        return ExcludedFile(relative, ExclusionReason.SYMLINK)
+    if gitignore.match_file(relative):
+        return ExcludedFile(relative, ExclusionReason.GITIGNORED)
+    return IncludedFile(
+        path=relative,
+        size_bytes=file_path.stat().st_size,
+        is_test=is_test_path(relative),
+    )
+
+
 def scan(root: Path, max_file_size_bytes: int) -> ScanResult:
     """Walk root and list the .py files to index.
 
-    Work in progress: pruning is applied, but every .py file is still included
-    (symlink, gitignore, size and readability checks come next).
+    Work in progress: pruning, symlink and gitignore rules are applied;
+    size and readability checks come next.
     """
     if max_file_size_bytes <= 0:
         raise ValueError("max_file_size_bytes must be > 0")
@@ -143,7 +163,9 @@ def scan(root: Path, max_file_size_bytes: int) -> ScanResult:
     if not root.is_dir():
         raise NotADirectoryError(f"scan root is not a directory: {root}")
 
+    gitignore = load_gitignore(root)
     included: list[IncludedFile] = []
+    excluded: list[ExcludedFile] = []
     pruned_dirs: list[str] = []
     unreadable_dirs: list[str] = []
 
@@ -173,22 +195,21 @@ def scan(root: Path, max_file_size_bytes: int) -> ScanResult:
                 continue
             file_path = current / filename
             relative = file_path.relative_to(root).as_posix()
-            included.append(
-                IncludedFile(
-                    path=relative,
-                    size_bytes=file_path.stat().st_size,
-                    is_test=is_test_path(relative),
-                )
-            )
+            outcome = _classify_file(file_path, relative, gitignore)
+            if isinstance(outcome, IncludedFile):
+                included.append(outcome)
+            else:
+                excluded.append(outcome)
 
     # Sort on the "/" separated string, not on walk order, so results are deterministic.
     included.sort(key=lambda file: file.path)
+    excluded.sort(key=lambda file: file.path)
     pruned_dirs.sort()
     unreadable_dirs.sort()
     return ScanResult(
         root=root,
         included=tuple(included),
-        excluded=(),
+        excluded=tuple(excluded),
         pruned_dirs=tuple(pruned_dirs),
         unreadable_dirs=tuple(unreadable_dirs),
     )
