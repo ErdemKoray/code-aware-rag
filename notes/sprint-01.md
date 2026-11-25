@@ -28,7 +28,8 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 | c2b) | `SYMLINK` ve `GITIGNORED` kontrolleri (`_classify_file`) | `b6149d5 feat(scan): exclude symlinks and gitignored files` |
 | c2c) | `TOO_LARGE` ve `UNREADABLE` (dosya) kontrolleri, öncelik testleri | `89140dc feat(scan): exclude oversized and unreadable files` |
 | c2d) | Gerçek FastAPI klonunda doğrulama, sonuçlar notlara | `docs: record fastapi scan results` (bu commit) |
-| CLI | `rag scan [PATH]` komutu | `feat(cli): add scan command` (hash sonraki commit'te) |
+| CLI | `rag scan [PATH]` komutu | `6f7e6a4 feat(cli): add scan command` |
+| Kabul | `git ls-files` ile tarama sonucunun karşılaştırılması | `docs: record scan acceptance check` (hash sonraki commit'te) |
 | Ek | Talimat dosyaları, sprint notu | `512d4e2 chore: let claude code test and commit after each step`, `1429874 docs: add sprint 01 notes` |
 
 ## Kararlar ve gerekçeleri
@@ -110,6 +111,13 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
   - İki ardışık tarama birebir aynı (`==`): determinizm gerçek veride de doğrulandı.
   - **Eşik (K7) yorumu:** çekirdek dosyalar eşiğin çok altında (en büyüğü `routing.py`, 259 KB) ve hiçbir dosya `TOO_LARGE` olmadı, yani 500 KB şu an hiçbir şeyi elemiyor. Eşik 300_000'e inse yalnızca tek bir test dosyası (395 KB) elenirdi; çekirdek dosyalar için güvenli bir pay var. Karar değişmedi, 500_000 kalıyor; küçültmek retrieval deneylerinde ele alınabilir.
   - **Dikkat çekici bulgu:** dahil edilen dosyaların %92'si test. `is_test` bayrağı (K4) bu yüzden kritik: retrieval/eval aşamasında testlere düşük ağırlık vermek ya da "testler hariç" varyantı çalıştırmak gerçekten fark yaratacak.
+- **Kabul kontrolü: `git ls-files` ile birebir karşılaştırma** (2026-11-25, `data/repos/fastapi` 0.143.0 sabit sürümü; salt okunur, betik scratchpad'de):
+  - `git -C data/repos/fastapi ls-files "*.py"`: **1167** dosya.
+  - `docs_src/` ve `scripts/` altındakiler çıkarılınca (499 dosya): **668** dosya kaldı.
+  - `scan()` dahil listesi: **668** dosya. İki liste **birebir aynı** (iki yönde fark yok: yalnızca-scan'de 0, yalnızca-git'te 0).
+  - Daha sıkı varyant da aynı çıktı: yolun herhangi bir dizin bileşeni `PRUNED_DIR_NAMES` içindeyse çıkarmak da 668 verdi; yani iç içe budanan klasör kaynaklı gizli bir fark yok.
+  - Beklenen sonucun nedeni: klonda takip edilmeyen (untracked) `.py` dosyası, sembolik link, kök `.gitignore`'a takılan `.py` dosyası ya da büyük/okunamaz dosya yok. Bunlardan biri ortaya çıkarsa liste ayrışır; kontrol bu yüzden klon değiştiğinde tekrarlanmalı.
+  - Kontrol bir test olarak repoya **eklenmedi** (klona bağımlı olurdu). İleride istenirse `data/repos/fastapi` yoksa `skip` eden bir test olarak eklenebilir.
 - **Python 3.12 ile test: ÇALIŞTIRILAMADI.** `uv run --python 3.12 python -m pytest` için uv CPython 3.12.15'i indirdi ama Windows Uygulama Denetimi yorumlayıcıyı engelledi (`os error 4551`, `Failed to spawn: python`). CLAUDE.md ilkeyi başka yolla aşmayı yasakladığı için denenmedi. Proje `.venv`'inin bozulmaması için deneme ayrı bir ortam dizininde yapıldı; `.venv` ve `uv.lock` değişmedi.
   Dolaylı kanıt: `ruff check --target-version py312` temiz (ruff, hedef sürümde geçersiz sözdizimini hata olarak bildirir). Bu bir test çalıştırması değildir; 3.12'de davranış doğrulanmış sayılmaz.
 - c2'deki symlink testleri de aynı koşula bağlı: link kurulamayan ortamda `skip` olacak.
