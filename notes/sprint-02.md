@@ -24,7 +24,8 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
 | Hazırlık | S01 notunda Python 3.12 maddesi kapatıldı (CI'da 3.12 ve 3.14 yeşil) | `c203d99 docs: close sprint 01 python 3.12 item` |
 | Hazırlık | CI aksiyonları Node 24'e yükseltildi, Dependabot eklendi | `7480e2b ci: upgrade actions to node24 and enable dependabot` |
 | 1 | `tree-sitter` 0.27.0 ve `tree-sitter-python` 0.25.0 eklendi | `983c782 chore(deps): add tree-sitter and tree-sitter-python` |
-| 2 | `parsing/python.py`: `parse()`, `ParseResult`, `line_range()` + 31 test | `feat(parsing): add python parser` (hash sonraki commit'te) |
+| 2 | `parsing/python.py`: `parse()`, `ParseResult`, `line_range()` + 31 test | `663a8be feat(parsing): add python parser` |
+| 3 | `rag parse-debug <dosya>` + 9 test | `feat(cli): add parse-debug command` (hash sonraki commit'te) |
 
 ## Kararlar ve gerekçeleri
 
@@ -54,7 +55,8 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
   - Hatalı kaynak çökmeden ayrıştırılıyor: `def f(:` için ağaç yine kuruluyor (sıfır genişlikli `MISSING` `)`), sonraki `class_definition` korunuyor; `x = (1, 2` için üst düzeyde `ERROR` node'u var. `has_error` ikisinde de `True`.
   - `class A:\n` ve `def f():\n` (gövdesiz) `has_error=False` veriyor: gramer bunları hata saymıyor. Chunker bunu bilmeli.
 - **`line_range` sınır durumu gerçek veride var:** kök `module` her zaman son satırdan sonra 0. sütunda biter; ayrıca FastAPI'de (1167 dosya) kök dışı **29 node** bir sonraki satırın 0. sütununda bitiyor ve hepsi `string_content` (kapanış `"""` satır başındaki docstring'lerin içeriği). `line_continuation` (`\` ile satır devamı) de aynı biçimde biter. Kural uygulanınca `string_content` 1-2, ait olduğu `string` 1-3 satırı verir.
-- `uv run python -m pytest`: **139 geçti** (108 eski + 31 yeni).
+- **`parse-debug` (adım 3):** çıktı biçimi: ilk satır `has_error: True|False`; sonra üst düzey adlandırılmış node başına bir satır: `tip  Lx-y` (+ `  name=...`), tip sütunu en uzun tipe göre hizalı; boş dosyada `(no top-level nodes)`. `decorated_definition` için `name=`, sardığı fonksiyon/sınıfın adını gösterir (sahip talimatı: "fonksiyon ve sınıflarda"). Hatalı dosyada çıkış kodu 0, okunamayan dosya/dizinde `Error: cannot read ...` ve çıkış kodu 2. Çıktı ASCII (`isascii` testli). Gerçek dosyada (`fastapi/params.py`) elle denendi.
+- `uv run python -m pytest`: **148 geçti** (108 eski + 31 ayrıştırıcı + 9 CLI).
 
 ## Açık işler
 - Adımlar tablosundaki parser, `parse-debug`, toplu doğrulama ve `notes/tree-sitter.md` işleri.
