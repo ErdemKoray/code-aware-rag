@@ -30,6 +30,7 @@ The owner wants to understand every line. Follow these rules strictly:
 - Never modify anything under `data/repos/`. It is the pinned target repository; evaluation depends on it.
 - Never read or print `.env`. Settings come from `coderag.config.Settings`.
 - You may commit after tests and ruff pass. Never push, tag or merge unless asked.
+- Never create, edit or delete files outside the repository.
 
 ## Conventions
 - Layout: `src/coderag/`, tests in `tests/`.
