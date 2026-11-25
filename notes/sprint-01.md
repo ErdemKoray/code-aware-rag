@@ -8,7 +8,7 @@ Dışlanan her dosya için bir **gerekçe kodu** vermek.
 
 ## Durum
 Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budama, sıralama) bitti.
-`scan()` tamamlandı: budama, `unreadable_dirs` ve dört dosya kuralı (K2 sırasıyla `SYMLINK`, `GITIGNORED`, `TOO_LARGE`, `UNREADABLE`) çalışıyor ve gerçek FastAPI klonunda doğrulandı (aşağıda). Kalanlar: CLI özeti ve 3.12 doğrulaması (Açık işler).
+`scan()` tamamlandı: budama, `unreadable_dirs` ve dört dosya kuralı (K2 sırasıyla `SYMLINK`, `GITIGNORED`, `TOO_LARGE`, `UNREADABLE`) çalışıyor ve gerçek FastAPI klonunda doğrulandı (aşağıda). Python 3.12 ve 3.14 doğrulaması PR'ın CI'ında yapıldı (aşağıda).
 
 ## Adımlar ve commit'ler
 
@@ -31,7 +31,7 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 | CLI | `rag scan [PATH]` komutu | `6f7e6a4 feat(cli): add scan command` |
 | Kabul | `git ls-files` ile tarama sonucunun karşılaştırılması | `5af79e9 docs: record scan acceptance check` |
 | Düzeltme | Symlink tespiti `os.path.islink` ile (Python 3.12 uyumu) | `ffab71b fix(scan): detect symlinks with os.path.islink` |
-| CI | GitHub Actions: Python 3.12 + 3.14 matrisi | `ci: add github actions workflow` (bu commit) |
+| CI | GitHub Actions: Python 3.12 + 3.14 matrisi | `66ec805 ci: add github actions workflow` |
 | Ek | Talimat dosyaları, sprint notu | `512d4e2 chore: let claude code test and commit after each step`, `1429874 docs: add sprint 01 notes` |
 
 ## Kararlar ve gerekçeleri
@@ -82,7 +82,7 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 - **`load_gitignore`:** `pathspec.GitIgnoreSpec` (git'in kenar durumlarını `gitwildmatch` fabrikasından daha doğru taklit eder). Dosya yoksa boş spec; başka okuma hataları yukarı çıkar (yapılandırma hatası). `is_gitignored` sarmalayıcısı yok, `scan()` `spec.match_file(rel)` çağıracak.
 - **Gitignore'lu klasörler budanmaz;** içindeki dosyalar tek tek `GITIGNORED` olur (K3 yalnızca sabit liste için). Testle sabitlendi (c2b).
 - **Dosya başına akış (`_classify_file`):** `is_symlink` → `gitignore.match_file` → `stat` (hata → `UNREADABLE`) → `size > eşik` → `TOO_LARGE` → `open(..., "rb")` denemesi (hata → `UNREADABLE`) → dahil. Sonuçlar: gitignore'lu dosya hiç `stat` edilmez (testle kanıtlandı); büyük + okunamaz dosya `TOO_LARGE` kalır; `size == eşik` dahil. Testlerde `Path.stat` / `Path.open` yalnızca belirli dosyalar için `PermissionError` fırlatacak şekilde `monkeypatch` edildi.
-- **Kural sırası tek yerde:** dosya başına karar `_classify_file` içinde, ilk eşleşen kazanır (K1). `SYMLINK` kontrolü `os.path.islink()` ile (lstat tabanlı, hedefe dokunmaz); kırık linkler çökmeden `SYMLINK` olur. **Not:** ilk sürümde `Path.is_symlink()` kullanılmıştı; Python 3.12'nin `pathlib.py` kaynağı okunarak (çalıştırılmadı) görüldü ki 3.12'de `is_symlink` → `lstat` → `stat(follow_symlinks=False)` zinciriyle `PermissionError`'ı yukarı fırlatıyor, yani bir lstat izin hatası taramayı çökertir ve `stat` hatası testi 3.12'de patlar. 3.14 doğrudan `os.path.islink` kullandığı için yerelde görünmüyordu. `os.path.islink` her `OSError`'ı "link değil" sayar; hata sonraki `stat` adımında `UNREADABLE` olur. Bu düzeltmenin 3.12'de çalıştığı CI ile doğrulanacak. `GITIGNORED` kararı boyut ölçülmeden verilir, bu yüzden `size_bytes=None`.
+- **Kural sırası tek yerde:** dosya başına karar `_classify_file` içinde, ilk eşleşen kazanır (K1). `SYMLINK` kontrolü `os.path.islink()` ile (lstat tabanlı, hedefe dokunmaz); kırık linkler çökmeden `SYMLINK` olur. **Not:** ilk sürümde `Path.is_symlink()` kullanılmıştı; Python 3.12'nin `pathlib.py` kaynağı okunarak (çalıştırılmadı) görüldü ki 3.12'de `is_symlink` → `lstat` → `stat(follow_symlinks=False)` zinciriyle `PermissionError`'ı yukarı fırlatıyor, yani bir lstat izin hatası taramayı çökertir ve `stat` hatası testi 3.12'de patlar. 3.14 doğrudan `os.path.islink` kullandığı için yerelde görünmüyordu. `os.path.islink` her `OSError`'ı "link değil" sayar; hata sonraki `stat` adımında `UNREADABLE` olur. Bu düzeltmenin 3.12'de çalıştığı CI ile doğrulandı (aşağıdaki Doğrulama bölümüne bak). `GITIGNORED` kararı boyut ölçülmeden verilir, bu yüzden `size_bytes=None`.
 - **`scan()` içinde `max_file_size_bytes <= 0` için `ValueError`** (testli). Gerekçe: `scan()` `Settings` dışında da çağrılıyor; `Settings.gt=0` yetmez.
 - **`UNREADABLE` = `stat` hatası + `open(..., "rb")` denemesi.** Gerekçe: tarayıcı içerik okumadığı için yalnızca `stat` hatası pratikte neredeyse hiç tetiklenmez; açma denemesi izin hatalarını yakalar. Testte `monkeypatch` ile `PermissionError` (Windows'ta izin kaldırarak test güvenilir değil).
 - **Windows junction sınırı:** `os.walk` junction'ları symlink saymayabilir; kodda yorum olarak belirtildi, ayrıca ele alınmayacak (FastAPI klonunda beklenmiyor).
@@ -128,7 +128,8 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
   - Beklenen sonucun nedeni: klonda takip edilmeyen (untracked) `.py` dosyası, sembolik link, kök `.gitignore`'a takılan `.py` dosyası ya da büyük/okunamaz dosya yok. Bunlardan biri ortaya çıkarsa liste ayrışır; kontrol bu yüzden klon değiştiğinde tekrarlanmalı.
   - Kontrol bir test olarak repoya **eklenmedi** (klona bağımlı olurdu). İleride istenirse `data/repos/fastapi` yoksa `skip` eden bir test olarak eklenebilir.
 - **Python 3.12 ile test: ÇALIŞTIRILAMADI.** `uv run --python 3.12 python -m pytest` için uv CPython 3.12.15'i indirdi ama Windows Uygulama Denetimi yorumlayıcıyı engelledi (`os error 4551`, `Failed to spawn: python`). CLAUDE.md ilkeyi başka yolla aşmayı yasakladığı için denenmedi. Proje `.venv`'inin bozulmaması için deneme ayrı bir ortam dizininde yapıldı; `.venv` ve `uv.lock` değişmedi.
-  Dolaylı kanıt: `ruff check --target-version py312` temiz (ruff, hedef sürümde geçersiz sözdizimini hata olarak bildirir). Bu bir test çalıştırması değildir; 3.12'de davranış doğrulanmış sayılmaz.
+  Dolaylı kanıt: `ruff check --target-version py312` temiz (ruff, hedef sürümde geçersiz sözdizimini hata olarak bildirir). Bu bir test çalıştırması değildir; yerelde 3.12'de davranış doğrulanmış sayılmaz.
+- **Python 3.12 ve 3.14: CI'da doğrulandı (2026-11-26).** S01 PR'ının (#3) CI'ı Python 3.12 ve 3.14 matrisinin ikisinde de yeşil geçti: `uv sync --locked`, `ruff check`, `ruff format --check` ve `pytest` iki sürümde de başarılı. Bilgi sahibinden alındı; Actions sonucunu bu oturumdan görmedim. Böylece `requires-python >=3.12` iddiası ve `os.path.islink` düzeltmesinin 3.12'de çalıştığı doğrulanmış sayılır. Yerelde 3.12 hâlâ App Control tarafından engelli, doğrulama CI üzerinden.
 - c2'deki symlink testleri de aynı koşula bağlı: link kurulamayan ortamda `skip` olacak.
 
 ## Açık işler
@@ -137,7 +138,7 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 3. ~~Gerçek repoda duman testi~~ **Bitti:** 668 dahil / 616 test / 0 dışlanan.
 4. ~~CLI özeti~~ **Bitti:** `rag scan [PATH]` (bkz. Kararlar → CLI). `index` komutuna dokunulmadı; o S10'un işi.
 5. İç içe `.gitignore`: gerekirse ölçüp sonraki iterasyona.
-6. **Python 3.12 testleri: CI ile doğrulanacak.** App Control 3.12 yorumlayıcısını yerelde engelliyor. `.github/workflows/ci.yml` eklendi (push ve pull_request, `ubuntu-latest`, Python 3.12 ve 3.14 matrisi; `uv sync --locked`, `ruff check`, `ruff format --check`, `pytest`). **İlk yeşil CI çalışması görülene kadar `requires-python >=3.12` iddiası doğrulanmamıştır;** push yapılmadığı için workflow henüz hiç çalışmadı ve YAML'ı yerelde de ayrıştırılamadı (pyyaml kurulu değil).
+6. ~~Python 3.12 testleri~~ **Kapandı (2026-11-26):** CI'da hem 3.12 hem 3.14 yeşil geçti (bkz. Doğrulama). Aşağıdaki ayrıntı tarihsel kayıt olarak duruyor. Eski not: App Control 3.12 yorumlayıcısını yerelde engelliyor. `.github/workflows/ci.yml` eklendi (push ve pull_request, `ubuntu-latest`, Python 3.12 ve 3.14 matrisi; `uv sync --locked`, `ruff check`, `ruff format --check`, `pytest`). **İlk yeşil CI çalışması görülene kadar `requires-python >=3.12` iddiası doğrulanmamıştır;** push yapılmadığı için workflow henüz hiç çalışmadı ve YAML'ı yerelde de ayrıştırılamadı (pyyaml kurulu değil).
 
 ## Hakimiyet soruları
 - `os.walk`'ta `dirnames[:] = kept` neden `dirnames = kept` değil?

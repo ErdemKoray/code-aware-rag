@@ -20,7 +20,8 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
 | Adım | Ne yapıldı | Commit |
 |---|---|---|
 | Hazırlık | README'ye CI rozeti | `7ae1371 docs: add ci badge to readme` |
-| Hazırlık | Sprint 02 başlangıcı (`CLAUDE.md` sprint satırı, bu not) | `chore: start sprint 02` (bu commit) |
+| Hazırlık | Sprint 02 başlangıcı (`CLAUDE.md` sprint satırı, bu not) | `6b7e9c3 chore: start sprint 02` |
+| Hazırlık | S01 notunda Python 3.12 maddesi kapatıldı (CI'da 3.12 ve 3.14 yeşil) | `docs: close sprint 01 python 3.12 item` (hash sonraki commit'te) |
 
 ## Kararlar ve gerekçeleri
 
