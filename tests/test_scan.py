@@ -1,3 +1,4 @@
+import os
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from coderag.scan import (
     ScanResult,
     is_test_path,
     load_gitignore,
+    scan,
 )
 
 
@@ -367,3 +369,133 @@ def test_load_gitignore_ignores_nested_gitignore_files(tmp_path):
     (tmp_path / "pkg" / ".gitignore").write_text("x.py\n", encoding="utf-8")
 
     assert load_gitignore(tmp_path).match_file("pkg/x.py") is False
+
+
+# --- scan: skeleton (validation, walking, pruning, ordering) ---------------
+
+MAX_SIZE = 500_000
+
+
+def touch(root: Path, relative: str, content: bytes = b"") -> None:
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+
+
+@pytest.mark.parametrize("value", [0, -1])
+def test_scan_rejects_non_positive_size_limit(tmp_path, value):
+    with pytest.raises(ValueError, match="max_file_size_bytes"):
+        scan(tmp_path, value)
+
+
+def test_scan_missing_root_raises(tmp_path):
+    with pytest.raises(FileNotFoundError, match="does not exist"):
+        scan(tmp_path / "nope", MAX_SIZE)
+
+
+def test_scan_file_root_raises(tmp_path):
+    touch(tmp_path, "a.py")
+
+    with pytest.raises(NotADirectoryError, match="not a directory"):
+        scan(tmp_path / "a.py", MAX_SIZE)
+
+
+def test_scan_empty_directory(tmp_path):
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert result.root == tmp_path
+    assert result.included == ()
+    assert result.excluded == ()
+    assert result.pruned_dirs == ()
+
+
+def test_scan_only_lists_py_files(tmp_path):
+    touch(tmp_path, "app.py")
+    touch(tmp_path, "README.md")
+    touch(tmp_path, "types.pyi")
+    touch(tmp_path, "data.txt")
+    touch(tmp_path, "noext")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert [file.path for file in result.included] == ["app.py"]
+    assert result.excluded == ()
+
+
+def test_scan_paths_are_relative_and_slash_separated(tmp_path):
+    touch(tmp_path, "pkg/sub/mod.py")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert [file.path for file in result.included] == ["pkg/sub/mod.py"]
+    assert "\\" not in result.included[0].path
+
+
+def test_scan_records_file_size(tmp_path):
+    touch(tmp_path, "a.py", b"x" * 10)
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert result.included[0].size_bytes == 10
+
+
+def test_scan_tags_test_files(tmp_path):
+    touch(tmp_path, "app.py")
+    touch(tmp_path, "tests/test_app.py")
+    touch(tmp_path, "conftest.py")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert {file.path: file.is_test for file in result.included} == {
+        "app.py": False,
+        "conftest.py": True,
+        "tests/test_app.py": True,
+    }
+
+
+def test_scan_sorts_by_slash_string_not_walk_order(tmp_path):
+    # Created in reverse order. Plain string order puts "a.py" before "a/z.py"
+    # because "." sorts before "/", which a directory-by-directory walk would not.
+    touch(tmp_path, "b.py")
+    touch(tmp_path, "a/z.py")
+    touch(tmp_path, "a.py")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert [file.path for file in result.included] == ["a.py", "a/z.py", "b.py"]
+
+
+def test_scan_prunes_fixed_directories_and_reports_them(tmp_path):
+    touch(tmp_path, "keep.py")
+    touch(tmp_path, "scripts/tool.py")
+    touch(tmp_path, "pkg/scripts/deep.py")
+    touch(tmp_path, "node_modules/lib/x.py")
+    touch(tmp_path, ".venv/lib/y.py")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert [file.path for file in result.included] == ["keep.py"]
+    assert result.pruned_dirs == (".venv", "node_modules", "pkg/scripts", "scripts")
+
+
+def test_scan_prunes_by_exact_name_only(tmp_path):
+    touch(tmp_path, "scripts_extra/a.py")
+    touch(tmp_path, "my_build/b.py")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert [file.path for file in result.included] == ["my_build/b.py", "scripts_extra/a.py"]
+    assert result.pruned_dirs == ()
+
+
+def test_scan_does_not_follow_directory_symlinks(tmp_path):
+    touch(tmp_path, "real/mod.py")
+    try:
+        os.symlink(tmp_path / "real", tmp_path / "link", target_is_directory=True)
+    except OSError, NotImplementedError:
+        pytest.skip("cannot create symlinks in this environment")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert [file.path for file in result.included] == ["real/mod.py"]
+    assert result.excluded == ()

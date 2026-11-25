@@ -1,3 +1,4 @@
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
@@ -125,3 +126,57 @@ def load_gitignore(root: Path) -> GitIgnoreSpec:
     except FileNotFoundError:
         return GitIgnoreSpec.from_lines([])
     return GitIgnoreSpec.from_lines(text.splitlines())
+
+
+def scan(root: Path, max_file_size_bytes: int) -> ScanResult:
+    """Walk root and list the .py files to index.
+
+    Work in progress: pruning is applied, but every .py file is still included
+    (symlink, gitignore, size and readability checks come next).
+    """
+    if max_file_size_bytes <= 0:
+        raise ValueError("max_file_size_bytes must be > 0")
+    if not root.exists():
+        raise FileNotFoundError(f"scan root does not exist: {root}")
+    if not root.is_dir():
+        raise NotADirectoryError(f"scan root is not a directory: {root}")
+
+    included: list[IncludedFile] = []
+    pruned_dirs: list[str] = []
+
+    # followlinks=False: symlinked directories are listed but never entered.
+    # Known limit: Windows junctions are not reported as symlinks, so they may be followed.
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+        current = Path(dirpath)
+
+        kept: list[str] = []
+        for dirname in dirnames:
+            if dirname in PRUNED_DIR_NAMES:
+                pruned_dirs.append((current / dirname).relative_to(root).as_posix())
+            else:
+                kept.append(dirname)
+        # Assign in place: os.walk only skips what is removed from this very list.
+        dirnames[:] = kept
+
+        for filename in filenames:
+            if not filename.endswith(".py"):
+                continue
+            file_path = current / filename
+            relative = file_path.relative_to(root).as_posix()
+            included.append(
+                IncludedFile(
+                    path=relative,
+                    size_bytes=file_path.stat().st_size,
+                    is_test=is_test_path(relative),
+                )
+            )
+
+    # Sort on the "/" separated string, not on walk order, so results are deterministic.
+    included.sort(key=lambda file: file.path)
+    pruned_dirs.sort()
+    return ScanResult(
+        root=root,
+        included=tuple(included),
+        excluded=(),
+        pruned_dirs=tuple(pruned_dirs),
+    )
