@@ -8,7 +8,7 @@ Dışlanan her dosya için bir **gerekçe kodu** vermek.
 
 ## Durum
 Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budama, sıralama) bitti.
-`scan()` tamamlandı: budama, `unreadable_dirs` ve dört dosya kuralı (K2 sırasıyla `SYMLINK`, `GITIGNORED`, `TOO_LARGE`, `UNREADABLE`) çalışıyor. Gerçek FastAPI klonunda doğrulama bekliyor: **c2d**.
+`scan()` tamamlandı: budama, `unreadable_dirs` ve dört dosya kuralı (K2 sırasıyla `SYMLINK`, `GITIGNORED`, `TOO_LARGE`, `UNREADABLE`) çalışıyor ve gerçek FastAPI klonunda doğrulandı (aşağıda). Kalanlar: CLI özeti ve 3.12 doğrulaması (Açık işler).
 
 ## Adımlar ve commit'ler
 
@@ -24,10 +24,11 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 | b) | `load_gitignore` | `3ca6a35 feat(scan): load root gitignore` |
 | c1) | `scan()` iskeleti: doğrulama, gezme, budama, `.py` filtresi, sıralama | `f2ff1d1 feat(scan): walk and prune directories` |
 | Altyapı | `requires-python` `>=3.12`, `uv.lock` ve README güncellendi | `9a2489c chore: support python 3.12 and later` |
-| c2a) | `ScanResult.unreadable_dirs` + `os.walk(onerror=...)` | `feat(scan): report directories that cannot be listed` (hash c2d'de) |
-| c2b) | `SYMLINK` ve `GITIGNORED` kontrolleri (`_classify_file`) | `feat(scan): exclude symlinks and gitignored files` (hash c2d'de) |
-| c2c) | `TOO_LARGE` ve `UNREADABLE` (dosya) kontrolleri, öncelik testleri | `feat(scan): exclude oversized and unreadable files` (hash c2d'de) |
-| c2d) | Gerçek FastAPI klonunda doğrulama, sonuçlar notlara | **bekliyor** |
+| c2a) | `ScanResult.unreadable_dirs` + `os.walk(onerror=...)` | `cd9d606 feat(scan): report directories that cannot be listed` |
+| c2b) | `SYMLINK` ve `GITIGNORED` kontrolleri (`_classify_file`) | `b6149d5 feat(scan): exclude symlinks and gitignored files` |
+| c2c) | `TOO_LARGE` ve `UNREADABLE` (dosya) kontrolleri, öncelik testleri | `89140dc feat(scan): exclude oversized and unreadable files` |
+| c2d) | Gerçek FastAPI klonunda doğrulama, sonuçlar notlara | `docs: record fastapi scan results` (bu commit) |
+| Ek | Talimat dosyaları, sprint notu | `512d4e2 chore: let claude code test and commit after each step`, `1429874 docs: add sprint 01 notes` |
 
 ## Kararlar ve gerekçeleri
 
@@ -90,17 +91,24 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
   Kenar durum kararı: **kökün kendisi listelenemezse** `OSError` yukarı çıkar (K10 ile aynı mantık: erişilemeyen kök çağıran tarafın sorunu, "eksik ama devam" sayılmaz). Testte `os.scandir` `monkeypatch` ile `PermissionError` fırlatacak şekilde değiştirilir (Windows'ta izin kaldırmak güvenilir değil).
 
 ## Doğrulama
-- `uv run python -m pytest`: **100 passed, 0 skipped** (c2c sonrası, 2026-11-25).
+- `uv run python -m pytest`: **100 passed, 0 skipped** (c2 sonrası, 2026-11-25).
 - `uv run python -m ruff check .` ve `uv run python -m ruff format --check .`: temiz.
 - **Symlink testi:** `test_scan_does_not_follow_directory_symlinks` ilk çalıştırmada bu makinede atlanmıştı (link oluşturulamadı). Geliştirici Modu açıldıktan sonra atlanmadan çalıştı ve geçti: klasör linkleri gezilmiyor ve kayıt üretmiyor (K8 madde 6).
+- **Gerçek repo duman testi** (`data/repos/fastapi`, `Settings().max_file_size_bytes = 500_000`, 2026-11-25; betik scratchpad'de, repoya girmedi):
+  - `included` 668 dosya, bunların **616'sı test** (`tests/` 616, `fastapi/` 52). `excluded` 0: kök `.gitignore` hiçbir `.py` dosyasını elemedi, sembolik link, büyük dosya ve okunamaz dosya yok. `unreadable_dirs` boş.
+  - `pruned_dirs`: `.git`, `docs_src`, `scripts`.
+  - En büyük 5: `tests/test_include_router_defaults_overrides.py` 394_863; `fastapi/routing.py` 259_409; `fastapi/applications.py` 185_937; `tests/test_generate_unique_id_function.py` 76_760; `fastapi/param_functions.py` 69_596.
+  - İki ardışık tarama birebir aynı (`==`): determinizm gerçek veride de doğrulandı.
+  - **Eşik (K7) yorumu:** çekirdek dosyalar eşiğin çok altında (en büyüğü `routing.py`, 259 KB) ve hiçbir dosya `TOO_LARGE` olmadı, yani 500 KB şu an hiçbir şeyi elemiyor. Eşik 300_000'e inse yalnızca tek bir test dosyası (395 KB) elenirdi; çekirdek dosyalar için güvenli bir pay var. Karar değişmedi, 500_000 kalıyor; küçültmek retrieval deneylerinde ele alınabilir.
+  - **Dikkat çekici bulgu:** dahil edilen dosyaların %92'si test. `is_test` bayrağı (K4) bu yüzden kritik: retrieval/eval aşamasında testlere düşük ağırlık vermek ya da "testler hariç" varyantı çalıştırmak gerçekten fark yaratacak.
 - **Python 3.12 ile test: ÇALIŞTIRILAMADI.** `uv run --python 3.12 python -m pytest` için uv CPython 3.12.15'i indirdi ama Windows Uygulama Denetimi yorumlayıcıyı engelledi (`os error 4551`, `Failed to spawn: python`). CLAUDE.md ilkeyi başka yolla aşmayı yasakladığı için denenmedi. Proje `.venv`'inin bozulmaması için deneme ayrı bir ortam dizininde yapıldı; `.venv` ve `uv.lock` değişmedi.
   Dolaylı kanıt: `ruff check --target-version py312` temiz (ruff, hedef sürümde geçersiz sözdizimini hata olarak bildirir). Bu bir test çalıştırması değildir; 3.12'de davranış doğrulanmış sayılmaz.
 - c2'deki symlink testleri de aynı koşula bağlı: link kurulamayan ortamda `skip` olacak.
 
 ## Açık işler
-1. **c2:** `scan()` içinde symlink → gitignore → boyut → okunamaz kontrolleri, öncelik testleri (symlink + gitignored → `SYMLINK`; gitignored + büyük → `GITIGNORED`; büyük + okunamaz → `TOO_LARGE`), eşik sınırı (`==` dahil, `+1` `TOO_LARGE`), `unreadable_dirs`.
-2. **Eşiği veriyle doğrula:** gerçek FastAPI klonunda `largest()` çıktısına bak; çekirdek dosyalar (`applications.py`, `routing.py`) 500 KB altında kalıyor mu?
-3. **Gerçek repoda duman testi:** `data/repos/fastapi` üzerinde tarama; sayılar mantıklı mı (dahil, test, `GITIGNORED`, budanan klasörler).
+1. ~~c2 (dışlama kuralları, `unreadable_dirs`)~~ **Bitti** (c2a–c2c).
+2. ~~Eşiği veriyle doğrula~~ **Bitti:** çekirdek dosyalar 500 KB'ın çok altında (bkz. Doğrulama).
+3. ~~Gerçek repoda duman testi~~ **Bitti:** 668 dahil / 616 test / 0 dışlanan.
 4. **CLI özeti:** `index` komutunda tarama özeti (gerekçe sayıları, `pruned_dirs`, `unreadable_dirs`, en büyük 5 dosya).
 5. İç içe `.gitignore`: gerekirse ölçüp sonraki iterasyona.
 6. **Python 3.12 testleri:** App Control 3.12 yorumlayıcısını engelliyor; ya ilke bu yorumlayıcıya izin verecek şekilde güncellenmeli ya da testler CI'da (ör. GitHub Actions) 3.12 ile koşturulmalı. O zamana kadar `requires-python >=3.12` iddiası doğrulanmamıştır.
