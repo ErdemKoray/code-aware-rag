@@ -27,7 +27,7 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
 | 2 | `parsing/python.py`: `parse()`, `ParseResult`, `line_range()` + 31 test | `663a8be feat(parsing): add python parser` |
 | 3 | `rag parse-debug <dosya>` + 9 test | `d4d7378 feat(cli): add parse-debug command` |
 | 4 | Tüm FastAPI dosyalarının ayrıştırılması: kalıcı test (klon yoksa `skip`) + sayılar | `1e73578 test(parsing): parse every fastapi file` |
-| 5 | `notes/tree-sitter.md`: gözlemden derlenen node tipleri, alanlar, sınır durumları | `docs: add tree-sitter node reference` (hash sonraki commit'te) |
+| 5 | `notes/tree-sitter.md`: gözlemden derlenen node tipleri, alanlar, sınır durumları | `4c941d7 docs: add tree-sitter node reference` |
 
 ## Kararlar ve gerekçeleri
 
