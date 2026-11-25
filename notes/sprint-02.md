@@ -26,7 +26,8 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
 | 1 | `tree-sitter` 0.27.0 ve `tree-sitter-python` 0.25.0 eklendi | `983c782 chore(deps): add tree-sitter and tree-sitter-python` |
 | 2 | `parsing/python.py`: `parse()`, `ParseResult`, `line_range()` + 31 test | `663a8be feat(parsing): add python parser` |
 | 3 | `rag parse-debug <dosya>` + 9 test | `d4d7378 feat(cli): add parse-debug command` |
-| 4 | Tüm FastAPI dosyalarının ayrıştırılması: kalıcı test (klon yoksa `skip`) + sayılar | `test(parsing): parse every fastapi file` (hash sonraki commit'te) |
+| 4 | Tüm FastAPI dosyalarının ayrıştırılması: kalıcı test (klon yoksa `skip`) + sayılar | `1e73578 test(parsing): parse every fastapi file` |
+| 5 | `notes/tree-sitter.md`: gözlemden derlenen node tipleri, alanlar, sınır durumları | `docs: add tree-sitter node reference` (hash sonraki commit'te) |
 
 ## Kararlar ve gerekçeleri
 
@@ -70,5 +71,10 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
   - Sürüm kayması riski: `tree-sitter-python` güncellenirse (yeni gramer) bu test hata sayısını yakalayan ilk alarm olur.
 - `uv run python -m pytest`: **150 geçti** yerelde (108 eski + 31 ayrıştırıcı + 9 CLI + 2 toplu FastAPI testi); CI'da klon olmadığı için 148 geçer, 2 atlanır.
 
+- **`notes/tree-sitter.md` (adım 5):** 1167 dosyanın node/alan sayımından ve elle denenen örneklerden derlendi. Gramerle/beklentiyle **farklı çıkan 7 şey** belgenin 2. bölümünde tablo olarak: `async` ayrı tip değil; `decorator` alan değil çocuk tipi; `typed_parameter`'da `name` alanı yok; docstring ayrı node değil; `comment` her yerde çıkabiliyor (ör. satır sonu yorumu `function_definition`'ın çocuğu); gövdesiz `def f():` `has_error=False` veriyor; FastAPI'de hiç `ERROR`/`MISSING` yok.
+
 ## Açık işler
-- Adımlar tablosundaki parser, `parse-debug`, toplu doğrulama ve `notes/tree-sitter.md` işleri.
+1. **S03'e devredilen sorular** (ayrıntı `notes/tree-sitter.md` bölüm 6 ve 11): modül düzeyindeki `if_statement` (23) ve `try_statement` (18) içindeki tanımlar nasıl ele alınacak? Bunların içinde kaç tanım olduğu **ölçülmedi**.
+2. `has_error=False` her zaman "geçerli kod" demek değil (gövdesiz `def f():`). Chunker'ın buna güvenmemesi gerek.
+3. Python dışı kodlama bildirimi (`# -*- coding: latin-1 -*-`) olan dosya FastAPI'de çıkmadı; sorun gözlenmedi.
+4. CI sonucu: bu branch henüz push edilmedi; `tree-sitter` paketlerinin 3.12/3.14'te Linux'ta kurulması ve 2 klon testinin CI'da atlanması **görülmedi** (yalnızca kilit dosyasındaki paket listesi incelendi).
