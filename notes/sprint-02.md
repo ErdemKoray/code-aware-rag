@@ -22,7 +22,8 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
 | Hazırlık | README'ye CI rozeti | `7ae1371 docs: add ci badge to readme` |
 | Hazırlık | Sprint 02 başlangıcı (`CLAUDE.md` sprint satırı, bu not) | `6b7e9c3 chore: start sprint 02` |
 | Hazırlık | S01 notunda Python 3.12 maddesi kapatıldı (CI'da 3.12 ve 3.14 yeşil) | `c203d99 docs: close sprint 01 python 3.12 item` |
-| Hazırlık | CI aksiyonları Node 24'e yükseltildi, Dependabot eklendi | `ci: upgrade actions to node24 and enable dependabot` (hash sonraki commit'te) |
+| Hazırlık | CI aksiyonları Node 24'e yükseltildi, Dependabot eklendi | `7480e2b ci: upgrade actions to node24 and enable dependabot` |
+| 1 | `tree-sitter` 0.27.0 ve `tree-sitter-python` 0.25.0 eklendi | `chore(deps): add tree-sitter and tree-sitter-python` (hash sonraki commit'te) |
 
 ## Kararlar ve gerekçeleri
 
@@ -44,7 +45,9 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
 - Workflow yerelde çalıştırılamaz; bu değişikliğin doğrulaması bu branch'in push'unda CI'ın yeşil olmasına bağlı.
 
 ## Doğrulama
-(her adımdan sonra güncellenir)
+- **Bağımlılıklar (adım 1):** `uv add` sonrası import hemen denendi: `Language(tree_sitter_python.language())`, `Parser(...)`, `parse(b"def f():\n    pass\n")` → kök `module`, `has_error=False`. **Uygulama Denetimi yerel uzantıyı engellemedi.**
+- **CI için paket durumu:** `uv.lock`'ta `tree-sitter` 0.27.0 için `cp312` ve `cp314` (manylinux x86_64 dahil) hazır paketleri var; `tree-sitter-python` 0.25.0 `cp310-abi3` (tüm 3.10+ sürümlerinde çalışır). CI'ın kaynaktan derleme yapması gerekmiyor. Gerçek CI sonucu push'a bağlı, henüz görülmedi.
+- `uv run python -m pytest`: 108 geçti (bağımlılık eklemesi sonrası).
 
 ## Açık işler
 - Adımlar tablosundaki parser, `parse-debug`, toplu doğrulama ve `notes/tree-sitter.md` işleri.
