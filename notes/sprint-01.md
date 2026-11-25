@@ -29,7 +29,8 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 | c2c) | `TOO_LARGE` ve `UNREADABLE` (dosya) kontrolleri, öncelik testleri | `89140dc feat(scan): exclude oversized and unreadable files` |
 | c2d) | Gerçek FastAPI klonunda doğrulama, sonuçlar notlara | `docs: record fastapi scan results` (bu commit) |
 | CLI | `rag scan [PATH]` komutu | `6f7e6a4 feat(cli): add scan command` |
-| Kabul | `git ls-files` ile tarama sonucunun karşılaştırılması | `docs: record scan acceptance check` (hash sonraki commit'te) |
+| Kabul | `git ls-files` ile tarama sonucunun karşılaştırılması | `5af79e9 docs: record scan acceptance check` |
+| Düzeltme | Symlink tespiti `os.path.islink` ile (Python 3.12 uyumu) | `fix(scan): detect symlinks with os.path.islink` (hash sonraki commit'te) |
 | Ek | Talimat dosyaları, sprint notu | `512d4e2 chore: let claude code test and commit after each step`, `1429874 docs: add sprint 01 notes` |
 
 ## Kararlar ve gerekçeleri
@@ -80,7 +81,7 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 - **`load_gitignore`:** `pathspec.GitIgnoreSpec` (git'in kenar durumlarını `gitwildmatch` fabrikasından daha doğru taklit eder). Dosya yoksa boş spec; başka okuma hataları yukarı çıkar (yapılandırma hatası). `is_gitignored` sarmalayıcısı yok, `scan()` `spec.match_file(rel)` çağıracak.
 - **Gitignore'lu klasörler budanmaz;** içindeki dosyalar tek tek `GITIGNORED` olur (K3 yalnızca sabit liste için). Testle sabitlendi (c2b).
 - **Dosya başına akış (`_classify_file`):** `is_symlink` → `gitignore.match_file` → `stat` (hata → `UNREADABLE`) → `size > eşik` → `TOO_LARGE` → `open(..., "rb")` denemesi (hata → `UNREADABLE`) → dahil. Sonuçlar: gitignore'lu dosya hiç `stat` edilmez (testle kanıtlandı); büyük + okunamaz dosya `TOO_LARGE` kalır; `size == eşik` dahil. Testlerde `Path.stat` / `Path.open` yalnızca belirli dosyalar için `PermissionError` fırlatacak şekilde `monkeypatch` edildi.
-- **Kural sırası tek yerde:** dosya başına karar `_classify_file` içinde, ilk eşleşen kazanır (K1). `SYMLINK` kontrolü `Path.is_symlink()` ile (lstat tabanlı, hedefe dokunmaz); kırık linkler çökmeden `SYMLINK` olur. `GITIGNORED` kararı boyut ölçülmeden verilir, bu yüzden `size_bytes=None`.
+- **Kural sırası tek yerde:** dosya başına karar `_classify_file` içinde, ilk eşleşen kazanır (K1). `SYMLINK` kontrolü `os.path.islink()` ile (lstat tabanlı, hedefe dokunmaz); kırık linkler çökmeden `SYMLINK` olur. **Not:** ilk sürümde `Path.is_symlink()` kullanılmıştı; Python 3.12'nin `pathlib.py` kaynağı okunarak (çalıştırılmadı) görüldü ki 3.12'de `is_symlink` → `lstat` → `stat(follow_symlinks=False)` zinciriyle `PermissionError`'ı yukarı fırlatıyor, yani bir lstat izin hatası taramayı çökertir ve `stat` hatası testi 3.12'de patlar. 3.14 doğrudan `os.path.islink` kullandığı için yerelde görünmüyordu. `os.path.islink` her `OSError`'ı "link değil" sayar; hata sonraki `stat` adımında `UNREADABLE` olur. Bu düzeltmenin 3.12'de çalıştığı CI ile doğrulanacak. `GITIGNORED` kararı boyut ölçülmeden verilir, bu yüzden `size_bytes=None`.
 - **`scan()` içinde `max_file_size_bytes <= 0` için `ValueError`** (testli). Gerekçe: `scan()` `Settings` dışında da çağrılıyor; `Settings.gt=0` yetmez.
 - **`UNREADABLE` = `stat` hatası + `open(..., "rb")` denemesi.** Gerekçe: tarayıcı içerik okumadığı için yalnızca `stat` hatası pratikte neredeyse hiç tetiklenmez; açma denemesi izin hatalarını yakalar. Testte `monkeypatch` ile `PermissionError` (Windows'ta izin kaldırarak test güvenilir değil).
 - **Windows junction sınırı:** `os.walk` junction'ları symlink saymayabilir; kodda yorum olarak belirtildi, ayrıca ele alınmayacak (FastAPI klonunda beklenmiyor).

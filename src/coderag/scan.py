@@ -138,8 +138,10 @@ def _classify_file(
     Order: symlink, gitignore, size, readability. A rule only runs if every earlier
     rule passed, so e.g. a gitignored file is never stat-ed.
     """
-    # is_symlink() looks at the link itself (lstat), so the target is never touched.
-    if file_path.is_symlink():
+    # islink() looks at the link itself (lstat), so the target is never touched. Unlike
+    # Path.is_symlink() on Python 3.12, it treats any OSError as "not a symlink", so an
+    # lstat failure falls through to the stat step below and ends up as UNREADABLE.
+    if os.path.islink(file_path):
         return ExcludedFile(relative, ExclusionReason.SYMLINK)
     if gitignore.match_file(relative):
         return ExcludedFile(relative, ExclusionReason.GITIGNORED)
