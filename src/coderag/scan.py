@@ -131,30 +131,44 @@ def load_gitignore(root: Path) -> GitIgnoreSpec:
 
 
 def _classify_file(
-    file_path: Path, relative: str, gitignore: GitIgnoreSpec
+    file_path: Path, relative: str, gitignore: GitIgnoreSpec, max_file_size_bytes: int
 ) -> IncludedFile | ExcludedFile:
     """Decide the fate of one .py file; the first matching rule wins (K1, K2).
 
-    Work in progress: symlink and gitignore rules are applied; the size and
-    readability checks come next.
+    Order: symlink, gitignore, size, readability. A rule only runs if every earlier
+    rule passed, so e.g. a gitignored file is never stat-ed.
     """
     # is_symlink() looks at the link itself (lstat), so the target is never touched.
     if file_path.is_symlink():
         return ExcludedFile(relative, ExclusionReason.SYMLINK)
     if gitignore.match_file(relative):
         return ExcludedFile(relative, ExclusionReason.GITIGNORED)
-    return IncludedFile(
-        path=relative,
-        size_bytes=file_path.stat().st_size,
-        is_test=is_test_path(relative),
-    )
+
+    try:
+        size_bytes = file_path.stat().st_size
+    except OSError:
+        return ExcludedFile(relative, ExclusionReason.UNREADABLE)
+    if size_bytes > max_file_size_bytes:  # equal to the limit is still included
+        return ExcludedFile(relative, ExclusionReason.TOO_LARGE, size_bytes)
+
+    # The scanner never reads contents, so open and close the file to find out
+    # whether it could be read (e.g. a PermissionError).
+    try:
+        with file_path.open("rb"):
+            pass
+    except OSError:
+        return ExcludedFile(relative, ExclusionReason.UNREADABLE)
+
+    return IncludedFile(path=relative, size_bytes=size_bytes, is_test=is_test_path(relative))
 
 
 def scan(root: Path, max_file_size_bytes: int) -> ScanResult:
     """Walk root and list the .py files to index.
 
-    Work in progress: pruning, symlink and gitignore rules are applied;
-    size and readability checks come next.
+    Returns the included files, every excluded file with a single reason code,
+    the pruned directories and the directories that could not be listed.
+    Raises ValueError for a non-positive size limit, FileNotFoundError or
+    NotADirectoryError for a bad root, and OSError if the root cannot be listed.
     """
     if max_file_size_bytes <= 0:
         raise ValueError("max_file_size_bytes must be > 0")
@@ -195,7 +209,7 @@ def scan(root: Path, max_file_size_bytes: int) -> ScanResult:
                 continue
             file_path = current / filename
             relative = file_path.relative_to(root).as_posix()
-            outcome = _classify_file(file_path, relative, gitignore)
+            outcome = _classify_file(file_path, relative, gitignore, max_file_size_bytes)
             if isinstance(outcome, IncludedFile):
                 included.append(outcome)
             else:

@@ -623,6 +623,95 @@ def test_scan_sorts_excluded_by_path_and_counts_reasons(tmp_path):
     }
 
 
+# --- scan: size and readability rules --------------------------------------
+
+
+def fail_on(monkeypatch, method: str, *blocked: Path) -> None:
+    """Make Path.<method> raise PermissionError for the given files only.
+
+    Removing permissions is not reliable on Windows, so the failure is simulated.
+    """
+    real = getattr(Path, method)
+
+    def fake(self, *args, **kwargs):
+        if self in blocked:
+            raise PermissionError(13, "Access is denied", str(self))
+        return real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, method, fake)
+
+
+def test_scan_size_limit_is_inclusive(tmp_path):
+    touch(tmp_path, "exact.py", b"x" * 100)
+    touch(tmp_path, "over.py", b"x" * 101)
+
+    result = scan(tmp_path, 100)
+
+    assert [file.path for file in result.included] == ["exact.py"]
+    assert excluded_by_path(result) == {"over.py": (ExclusionReason.TOO_LARGE, 101)}
+
+
+def test_scan_too_large_files_feed_largest(tmp_path):
+    touch(tmp_path, "small.py", b"x" * 10)
+    touch(tmp_path, "huge.py", b"x" * 500)
+
+    result = scan(tmp_path, 100)
+
+    assert result.largest(2) == (("huge.py", 500), ("small.py", 10))
+
+
+def test_scan_excludes_file_when_stat_fails(tmp_path, monkeypatch):
+    touch(tmp_path, "ok.py")
+    touch(tmp_path, "broken.py")
+    fail_on(monkeypatch, "stat", tmp_path / "broken.py")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert [file.path for file in result.included] == ["ok.py"]
+    assert excluded_by_path(result) == {"broken.py": (ExclusionReason.UNREADABLE, None)}
+
+
+def test_scan_excludes_file_when_open_fails_and_keeps_going(tmp_path, monkeypatch):
+    touch(tmp_path, "a.py")
+    touch(tmp_path, "locked.py", b"x" * 10)
+    touch(tmp_path, "z.py")
+    fail_on(monkeypatch, "open", tmp_path / "locked.py")
+
+    result = scan(tmp_path, MAX_SIZE)
+
+    assert [file.path for file in result.included] == ["a.py", "z.py"]
+    assert excluded_by_path(result) == {"locked.py": (ExclusionReason.UNREADABLE, None)}
+    assert result.exclusion_counts[ExclusionReason.UNREADABLE] == 1
+
+
+def test_scan_too_large_wins_over_unreadable(tmp_path, monkeypatch):
+    touch(tmp_path, "big_locked.py", b"x" * 200)
+    fail_on(monkeypatch, "open", tmp_path / "big_locked.py")
+
+    result = scan(tmp_path, 100)
+
+    assert excluded_by_path(result) == {"big_locked.py": (ExclusionReason.TOO_LARGE, 200)}
+
+
+def test_scan_gitignored_wins_over_size_and_is_never_stat_ed(tmp_path, monkeypatch):
+    (tmp_path / ".gitignore").write_text("big.py\n", encoding="utf-8")
+    touch(tmp_path, "big.py", b"x" * 200)
+    fail_on(monkeypatch, "stat", tmp_path / "big.py")
+
+    result = scan(tmp_path, 100)
+
+    assert excluded_by_path(result) == {"big.py": (ExclusionReason.GITIGNORED, None)}
+
+
+def test_scan_symlink_wins_over_size(tmp_path):
+    touch(tmp_path, "real.txt", b"x" * 200)
+    make_symlink(tmp_path / "link.py", tmp_path / "real.txt")
+
+    result = scan(tmp_path, 100)
+
+    assert excluded_by_path(result) == {"link.py": (ExclusionReason.SYMLINK, None)}
+
+
 # --- scan: directories that cannot be listed -------------------------------
 
 
