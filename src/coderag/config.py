@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,8 +22,11 @@ class Settings(BaseSettings):
 
     # Target repository, pinned so evaluation results stay comparable.
     fastapi_repo_path: Path = Path("data/repos/fastapi")
-    fastapi_tag: str = "PUT_TAG_HERE"
-    fastapi_sha: str = "PUT_SHA_HERE"
+    fastapi_tag: str = "0.143.0"
+    fastapi_sha: str = "f5c6e9b4f9cadc1bf0f9a1fd672e621206b63007"
+
+    # Scanner: .py files larger than this many bytes are excluded as TOO_LARGE.
+    max_file_size_bytes: int = Field(default=500_000, gt=0)
 
 
 def require(value: SecretStr | None, env_name: str) -> str:

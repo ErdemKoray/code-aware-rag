@@ -33,7 +33,7 @@ Question ──► Hybrid search ──► Rerank ──► Graph expansion
 
 | Layer | Choice |
 |---|---|
-| Language & tooling | Python 3.11+, uv, ruff, pytest |
+| Language & tooling | Python 3.12+, uv, ruff, pytest |
 | Parsing | tree-sitter |
 | Embeddings & reranking | Voyage AI |
 | Vector store | Qdrant |
@@ -54,7 +54,7 @@ Question ──► Hybrid search ──► Rerank ──► Graph expansion
 
 ## Getting started
 
-Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/), git.
+Requirements: Python 3.12+, [uv](https://docs.astral.sh/uv/), git.
 
 ```bash
 git clone https://github.com/<your-username>/code-aware-rag
@@ -69,7 +69,7 @@ Clone the target repository at its pinned version:
 
 ```bash
 git clone https://github.com/fastapi/fastapi data/repos/fastapi
-git -C data/repos/fastapi checkout <TAG>
+git -C data/repos/fastapi checkout <0.143.0>
 ```
 
 Check the setup:
@@ -83,8 +83,8 @@ uv run pytest
 
 Development and evaluation run against a pinned version of the [FastAPI](https://github.com/fastapi/fastapi) source code, so results stay comparable over time.
 
-- Tag: `<TAG>`
-- Commit: `<SHA>`
+- Tag: `0.143.0`
+- Commit: `f5c6e9b4f9cadc1bf0f9a1fd672e621206b63007`
 
 ## Project structure
 
