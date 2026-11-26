@@ -3,11 +3,9 @@
   "permissions": {
     "allow": [
       "PowerShell(uv run python -m pytest*)",
-      "PowerShell(uv run python -m ruff*)",
       "PowerShell(git add *)",
       "PowerShell(git commit *)",
       "Bash(uv run python -m pytest*)",
-      "Bash(uv run python -m ruff*)",
       "Bash(git add *)",
       "Bash(git commit *)"
     ],
