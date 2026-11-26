@@ -30,7 +30,8 @@ yeni alanlar varsayılan değerle eklenir. Şimdiden boş yer tutucu alan **aç�
 | 5 | Sınırı aşan parçaların bölünmesi (`chunking/split.py`) | `c5b457a feat(chunking): split oversized chunks` |
 | 6 | `rag chunk-debug` | `dd347f5 feat(cli): add chunk-debug command` |
 | 7a | Klon genelinde kalıcı test (`tests/test_chunking_fastapi.py`) | `9a9439d test(chunking): check chunk guarantees on fastapi` |
-| 7b | İstatistikler (200 bayt altı dahil), README | `docs: record sprint 03 results` |
+| 7b | İstatistikler (200 bayt altı dahil), README | `3bc5373 docs: record sprint 03 results` |
+| (ek) | `.claude/settings.json`: sahibi proje köküne altı dar ruff kuralı ekledi | `chore: allow ruff on the project root` |
 
 ## S03 öncesi sağlık kontrolü
 
@@ -262,9 +263,9 @@ ortadan kesilmiyor.
 - Adım 2 sonrası `uv run python -m pytest`: **210 geçti**.
 
 ## Açık işler
-1. P10: sahibi geniş `ruff*` izinlerini kaldırdı (`7493ab6`). Önerilen dar kurallar `settings.json`'da **yok**; gitignore'daki
-   `settings.local.json`'daki kurallar dışında her ruff çağrısı onay ister. İstenirse dar kurallar sahibi tarafından eklenebilir.
-   Yakalayıcı test (temiz çalışma ağacı) yerinde.
+1. ~~P10: `settings.json`'daki ruff izni~~ **Kapandı:** sahibi geniş `ruff*` izinlerini kaldırdı (`7493ab6`), sonra altı
+   dar kuralı ekledi (`ruff check .`, `ruff format .`, `ruff format --check .`; PowerShell ve Bash). Yakalayıcı test
+   (temiz çalışma ağacı) yerinde.
 2. ~~S02 PR'ının (#4) CI sonucu~~ **Kapandı:** yeşil, Node.js 20 uyarısı yok (`sprint-02.md` Açık işler 4).
 3. ~~Metot imzası listesinin biçimi~~ **Karara bağlandı** (S1, S2).
 4. ~~200 bayt altı ölçümü~~ **Yapıldı** (Sonuçlar). **Birleştirme kararı sahibinde.**
