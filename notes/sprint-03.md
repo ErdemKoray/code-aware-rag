@@ -81,12 +81,16 @@ Gruplar: **kaynak** = scan'in dahil edip test saymadığı 52 dosya; **test** = 
   yapılandırmayı uygular (`--show-settings` ile doğrulandı: `Settings path: data/repos/fastapi/pyproject.toml`,
   `force_exclude = false`). Bu yüzden kök ayarlar klonun içine **ulaşmaz**: `ruff format data/repos/fastapi/...` klonu
   hâlâ değiştirebilir. Ayarlar `data/` altındaki diğer dosyalar (ör. `data/out/`) için çalışıyor (geçici dosyayla doğrulandı).
-  Proje genelinde `ruff ... .` zaten `.gitignore` sayesinde `data/`'ya girmiyor. Kalan boşluk için karar sahibinde (Açık işler 1).
+  Proje genelinde `ruff ... .` zaten `.gitignore` sayesinde `data/`'ya girmiyor.
+  **Kalan boşluk için alınan karar:** (a) pin testine klonun çalışma ağacının temiz olduğu kontrolü eklendi
+  (`test_clone_working_tree_is_clean`; değiştirilmiş, stage'lenmiş ve takipsiz dosyaları yakalar, `.gitignore`'a takılanları
+  göstermez; yardımcı fonksiyon geçici bir git reposunda sınanır); (b) `.claude/settings.json`'daki ruff iznini daraltmayı
+  sahibi yapacak. (a) engelleyici değil, **yakalayıcı** bir kontroldür.
 
 ## Doğrulama
 - `uv run python -m pytest`: **152 geçti** (düzeltmelerden sonra); `ruff check` ve `ruff format --check` temiz.
 
 ## Açık işler
-1. P10'un kalan boşluğu: klona açık yolla ruff çalıştırmayı engellemek (seçenekler sahibine sunuldu).
+1. P10: `.claude/settings.json`'daki `ruff*` izninin daraltılması (sahibi yapacak; kurallar sohbette verildi). Yakalayıcı test eklendi.
 2. ~~S02 PR'ının (#4) CI sonucu~~ **Kapandı:** yeşil, Node.js 20 uyarısı yok (`sprint-02.md` Açık işler 4).
 3. Chunker planının ve tasarım kararlarının onayı.
