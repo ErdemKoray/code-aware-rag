@@ -22,7 +22,7 @@ her düzeltme grubu ayrı commit olarak uygulandı.
 | P9 | `.env.example`, `.gitignore`, `.gitmessage`, `__main__.py` diskte LF'ye çevrildi (silip `git checkout --`; içerik aynı) | commit yok: indeks zaten LF idi, diff oluşmadı |
 | P10 | Ruff: `extend-exclude = ["data/**"]`, `force-exclude = true`; `.gitignore`: `.env.*` (`.env.example` hariç). **Kısmi çözüm, aşağıya bak** | `189ff03 chore: exclude data from ruff and ignore env variants` |
 | P13 | CI: `push` yalnızca `main`; `timeout-minutes: 10`; `concurrency` (yalnızca PR çalışmaları iptal edilir, `main` çalışmaları tamamlanır); yanlış yorum düzeltildi. Yerelde çalıştırılamaz, doğrulaması PR'ın CI'ında | `200764a ci: limit push trigger and add timeout and concurrency` |
-| LICENSE | MIT, "Copyright (c) 2026 Erdem Koray" | `e685a04 docs: add mit license` |
+| LICENSE | MIT, "Copyright (c) 2026 Koray Erdem" (ilk commit'te ad sırası ters yazılmıştı, düzeltildi) | `e685a04 docs: add mit license`, `docs: fix license holder name` |
 | P11 | README: durum ve roadmap, çalışan komutlar (`scan`, `parse-debug`), proje yapısı, düzeltilmiş clone/checkout komutları, Uygulama Denetimi notu, lisans. Komutlar standart biçimde (`uv run rag`, `uv run pytest`); bu biçimler bu makinede engelli olduğu için burada çalıştırılarak denenmedi | `a31987d docs: update readme` |
 | P12 | Sprint notları: eski/çelişen cümleler düzeltildi, `sprint-00`'a "Açık işler", `sprint-02`'ye "Durum" ve "Hakimiyet soruları" açıldı. Mevcut hakimiyet sorularına dokunulmadı, hiçbirine cevap yazılmadı | `23e1995 docs: tidy sprint notes` |
 
