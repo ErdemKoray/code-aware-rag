@@ -28,7 +28,7 @@ def parse_failures(root: Path, relative_paths: list[str]) -> list[str]:
     for relative in relative_paths:
         try:
             result = parse((root / relative).read_bytes())
-        except Exception as error:  # noqa: BLE001 - any exception is a failure to report
+        except Exception as error:  # any exception is a failure to report
             failures.append(f"{relative}: raised {error!r}")
             continue
         if result.has_error:

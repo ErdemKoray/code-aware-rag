@@ -17,6 +17,7 @@ her düzeltme grubu ayrı commit olarak uygulanıyor.
 | P5 | `pydantic` doğrudan bağımlılık olarak eklendi (`>=2.14.1`; kurulu sürüm zaten buydu) | `chore(deps): declare pydantic dependency` |
 | P6 | `pyproject.toml` açıklaması yazıldı | `chore: describe the project in pyproject` |
 | P7 | `tests/test_target_repo.py`: klonun `HEAD`'i ve tag'i config'deki SHA ile aynı; klon yoksa `skip` | `test(config): verify fastapi clone matches pinned version` |
+| P8 | Kullanılmayan `noqa` kaldırıldı; ters yazılmış karşılaştırma `expected` değişkeniyle düzeltildi | `test: fix unused noqa and yoda condition` |
 
 ## Kararlar ve gerekçeleri
 - **Kodu Claude yazar** (çekirdek mantık dahil). Sprint başında plan ve tasarım kararları sunulur, onaydan sonra her adımda

@@ -54,7 +54,7 @@ def test_exclusion_reason_values_are_plain_strings():
 
 
 def test_pruned_dir_names_matches_decided_list():
-    assert PRUNED_DIR_NAMES == {
+    expected = {
         ".git",
         ".venv",
         "venv",
@@ -69,6 +69,8 @@ def test_pruned_dir_names_matches_decided_list():
         "docs_src",
         "scripts",
     }
+
+    assert expected == PRUNED_DIR_NAMES
 
 
 def test_pruned_dir_names_is_immutable():
