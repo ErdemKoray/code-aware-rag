@@ -22,7 +22,7 @@ yeni alanlar varsayılan değerle eklenir. Şimdiden boş yer tutucu alan **aç�
 ## Adımlar
 | # | Adım | Commit |
 |---|---|---|
-| 1 | `Settings.max_chunk_bytes`, `Chunk` veri modeli | bekliyor |
+| 1 | `Settings.max_chunk_bytes`, `Chunk` veri modeli | `5fb4190 feat(config): add max_chunk_bytes setting`, `feat(chunking): add chunk data model` |
 | 2 | Fonksiyon chunk'ları | bekliyor |
 | 3 | Sınıfların bölünmesi (`class_header`, `method`, `class`) | karar bekliyor (Açık işler) |
 | 4 | Modül düzeyi bloklar, sınıf blokları, yorumların bağlanması, bileşik ifadeler | bekliyor |
@@ -146,8 +146,16 @@ buraya yazılacak; karar sonra.
   göstermez; yardımcı fonksiyon geçici bir git reposunda sınanır); (b) `.claude/settings.json`'daki ruff iznini daraltmayı
   sahibi yapacak. (a) engelleyici değil, **yakalayıcı** bir kontroldür.
 
+### Veri modeli (adım 1)
+- `Chunk` (`frozen`, `slots`, `kw_only`): onaylanan alanlar + C10 için `has_error` (dosya düzeyinde işaret). Türetilen
+  `size_bytes` (UTF-8).
+- `__post_init__` atıf güvencelerini zorlar: satır aralığı geçerli; `text`'teki satır sayısı aralıkla birebir aynı; parça
+  numarası geçerli; yalnızca `module` chunk'ının `qualname`'i yok.
+- `make_chunk_id`: `sha256(path \0 qualname \0 kind \0 text)`'in ilk 16 hex karakteri (64 bit); birebir aynı chunk'larda
+  kaynak sırasına göre `-2`, `-3` eki (C9).
+
 ## Doğrulama
-- `uv run python -m pytest`: **152 geçti** (düzeltmelerden sonra); `ruff check` ve `ruff format --check` temiz.
+- `uv run python -m pytest`: **152 geçti** (sağlık kontrolü düzeltmelerinden sonra); `ruff check` ve `ruff format --check` temiz.
 
 ## Açık işler
 1. P10: `.claude/settings.json`'daki `ruff*` izninin daraltılması (sahibi yapacak; kurallar sohbette verildi). Yakalayıcı test eklendi.
