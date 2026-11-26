@@ -28,8 +28,9 @@ yeni alanlar varsayılan değerle eklenir. Şimdiden boş yer tutucu alan **aç�
 | 3 | Sınıfların bölünmesi (`class_header`, `method`, `class`, iç sınıflar) | `0e4c93a feat(chunking): split classes into header and members` |
 | 4 | Modül düzeyi bloklar, sınıf blokları, yorumların bağlanması, bileşik ifadeler | `cdf82e1 feat(chunking): add module and class blocks` |
 | 5 | Sınırı aşan parçaların bölünmesi (`chunking/split.py`) | `c5b457a feat(chunking): split oversized chunks` |
-| 6 | `rag chunk-debug` | `feat(cli): add chunk-debug command` |
-| 7 | Klon genelinde kalıcı test, istatistikler (200 bayt altı chunk sayısı dahil), README | bekliyor |
+| 6 | `rag chunk-debug` | `dd347f5 feat(cli): add chunk-debug command` |
+| 7a | Klon genelinde kalıcı test (`tests/test_chunking_fastapi.py`) | `test(chunking): check chunk guarantees on fastapi` |
+| 7b | İstatistikler (200 bayt altı dahil), README | `docs: record sprint 03 results` |
 
 ## S03 öncesi sağlık kontrolü
 
