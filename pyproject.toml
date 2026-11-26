@@ -30,6 +30,11 @@ dev = [
 
 [tool.ruff]
 line-length = 100
+# data/ holds the target repository and scratch output: skip it even when a path inside it
+# is passed explicitly (force-exclude). Limit: files in data/repos/fastapi follow that
+# project's own pyproject.toml, so these two settings do not reach them.
+extend-exclude = ["data/**"]
+force-exclude = true
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

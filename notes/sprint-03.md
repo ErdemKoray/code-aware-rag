@@ -18,6 +18,8 @@ her düzeltme grubu ayrı commit olarak uygulanıyor.
 | P6 | `pyproject.toml` açıklaması yazıldı | `chore: describe the project in pyproject` |
 | P7 | `tests/test_target_repo.py`: klonun `HEAD`'i ve tag'i config'deki SHA ile aynı; klon yoksa `skip` | `test(config): verify fastapi clone matches pinned version` |
 | P8 | Kullanılmayan `noqa` kaldırıldı; ters yazılmış karşılaştırma `expected` değişkeniyle düzeltildi | `test: fix unused noqa and yoda condition` |
+| P9 | `.env.example`, `.gitignore`, `.gitmessage`, `__main__.py` diskte LF'ye çevrildi (silip `git checkout --`; içerik aynı) | commit yok: indeks zaten LF idi, diff oluşmadı |
+| P10 | Ruff: `extend-exclude = ["data/**"]`, `force-exclude = true`; `.gitignore`: `.env.*` (`.env.example` hariç). **Kısmi çözüm, aşağıya bak** | `chore: exclude data from ruff and ignore env variants` |
 
 ## Kararlar ve gerekçeleri
 - **Kodu Claude yazar** (çekirdek mantık dahil). Sprint başında plan ve tasarım kararları sunulur, onaydan sonra her adımda
@@ -30,5 +32,11 @@ her düzeltme grubu ayrı commit olarak uygulanıyor.
   "klon yok" ölçütü olarak `.git` varlığına bakar. Git komutları `--no-optional-locks` ile çalışır, hedef repoya hiçbir şey yazmaz.
   Test geçiyor, klon gizliyken atlanıyor ve yanlış SHA verildiğinde başarısız oluyor (üçü de elle doğrulandı).
 
+- **Ruff dışlamasının sınırı (P10):** `data/repos/fastapi` kendi `pyproject.toml`'una sahip ve ruff her dosyaya en yakın
+  yapılandırmayı uygular (`--show-settings` ile doğrulandı: `Settings path: data/repos/fastapi/pyproject.toml`,
+  `force_exclude = false`). Bu yüzden kök ayarlar klonun içine **ulaşmaz**: `ruff format data/repos/fastapi/...` klonu
+  hâlâ değiştirebilir. Ayarlar `data/` altındaki diğer dosyalar (ör. `data/out/`) için çalışıyor (geçici dosyayla doğrulandı).
+  Proje genelinde `ruff ... .` zaten `.gitignore` sayesinde `data/`'ya girmiyor. Kalan boşluk için karar sahibinde (Açık işler 1).
+
 ## Açık işler
-(plan onayından sonra güncellenecek)
+1. P10'un kalan boşluğu: klona açık yolla ruff çalıştırmayı engellemek (seçenekler sahibine sunuldu).
