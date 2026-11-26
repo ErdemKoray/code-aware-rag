@@ -15,6 +15,7 @@ her düzeltme grubu ayrı commit olarak uygulanıyor.
 | (ek) | Dependabot'un `actions/checkout` v6 → v7 PR'ı (#5) sahibi tarafından merge edildi | `0baf20a`, merge `95fe3a5` |
 | P1–P3 | `CLAUDE.md`: sprint S03; "learning project" bölümü kaldırıldı; Working mode yenilendi; repo dışı dosya kuralına istisnalar | `chore: update claude instructions for sprint 03` |
 | P5 | `pydantic` doğrudan bağımlılık olarak eklendi (`>=2.14.1`; kurulu sürüm zaten buydu) | `chore(deps): declare pydantic dependency` |
+| P6 | `pyproject.toml` açıklaması yazıldı | `chore: describe the project in pyproject` |
 
 ## Kararlar ve gerekçeleri
 - **Kodu Claude yazar** (çekirdek mantık dahil). Sprint başında plan ve tasarım kararları sunulur, onaydan sonra her adımda

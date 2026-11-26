@@ -1,7 +1,7 @@
 [project]
 name = "coderag"
 version = "0.1.0"
-description = "Add your description here"
+description = "AST-based retrieval-augmented generation over Python repositories, with file:line citations."
 readme = "README.md"
 authors = [
     { name = "Koray Erdem", email = "korayerdem5252@gmail.com" }
