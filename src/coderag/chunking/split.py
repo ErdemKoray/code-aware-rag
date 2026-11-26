@@ -1,7 +1,9 @@
-"""Cut an oversized line range into parts at syntax boundaries (decision C5).
+"""Cut an oversized line range into parts at syntax boundaries (decisions C5, B1).
 
-Parameters of a signature and statements of a body are the preferred cut points, found
-level by level down the tree; plain lines are the last resort.
+First the range is broken into atoms, pieces that are never cut apart: the largest
+syntax units that fit (parameters, statements), found level by level down the tree, and
+plain lines as the last resort. Then neighbouring atoms are grouped into the fewest
+parts that fit, as equal in size as possible.
 """
 
 from itertools import accumulate
@@ -69,6 +71,10 @@ class LineSplitter:
 
         Each part is at most max_bytes long, unless it is a single longer line.
         """
+        return self._balance(self._atoms(first_line, last_line))
+
+    def _atoms(self, first_line: int, last_line: int) -> list[tuple[int, int]]:
+        """The range as pieces that are never cut apart, each without blank edges."""
         while first_line <= last_line and self._is_blank(first_line):
             first_line += 1
         while last_line >= first_line and self._is_blank(last_line):
@@ -78,18 +84,28 @@ class LineSplitter:
         if first_line == last_line or self._size(first_line, last_line) <= self._max_bytes:
             return [(first_line, last_line)]
 
-        starts = self._cut_points(first_line, last_line)
-        if starts:
-            ends = [start - 1 for start in starts] + [last_line]
-            segments = zip([first_line, *starts], ends, strict=True)
-            parts = [part for segment in segments for part in self.split(*segment)]
-        else:
+        cuts, introductions = self._cut_points(first_line, last_line)
+        if not cuts:
             numbers = range(first_line, last_line + 1)
-            parts = [(number, number) for number in numbers if not self._is_blank(number)]
-        return self._pack(parts)
+            return [(number, number) for number in numbers if not self._is_blank(number)]
 
-    def _cut_points(self, first_line: int, last_line: int) -> list[int]:
-        """Lines after first_line where the highest possible syntax level can be cut."""
+        atoms: list[tuple[int, int]] = []
+        introduces_next = False
+        ends = [cut - 1 for cut in cuts] + [last_line]
+        for start, end in zip([first_line, *cuts], ends, strict=True):
+            found = self._atoms(start, end)
+            if introduces_next:
+                self._glue(atoms, found)
+            atoms += found
+            introduces_next = start in introductions
+        return atoms
+
+    def _cut_points(self, first_line: int, last_line: int) -> tuple[list[int], frozenset[int]]:
+        """Lines after first_line where the highest possible syntax level can be cut.
+
+        Also returns the segment starts (first_line or a cut) whose segment only
+        introduces the next one: the header of an enclosing unit, or a decorator.
+        """
         level = [self._root]
         while level:
             units = []
@@ -98,12 +114,16 @@ class LineSplitter:
                     unit_first, unit_last = line_range(unit)
                     if unit_first <= last_line and unit_last >= first_line:
                         units.append(unit)
-            starts = {self._start_line(unit, first_line) for unit in units}
-            cuts = sorted(start for start in starts if first_line < start <= last_line)
+            starts = [(self._start_line(unit, first_line), unit.type) for unit in units]
+            cuts = sorted({start for start, _ in starts if first_line < start <= last_line})
             if cuts:
-                return cuts
+                whole = {start for start, kind in starts if kind != "decorator"}
+                introductions = {cut for cut in cuts if cut not in whole}
+                if not any(start <= first_line for start in whole):
+                    introductions.add(first_line)
+                return cuts, frozenset(introductions)
             level = units
-        return []
+        return [], frozenset()
 
     def _start_line(self, node: Node, floor: int) -> int:
         """First line of a node, including the comment lines directly above it."""
@@ -112,16 +132,36 @@ class LineSplitter:
             line -= 1
         return line
 
-    def _pack(self, parts: list[tuple[int, int]]) -> list[tuple[int, int]]:
-        """Join neighbouring parts, greedily, while the result still fits."""
-        packed = parts[:1]
-        for first_line, last_line in parts[1:]:
-            previous_first = packed[-1][0]
-            if self._size(previous_first, last_line) <= self._max_bytes:
-                packed[-1] = (previous_first, last_line)
-            else:
-                packed.append((first_line, last_line))
-        return packed
+    def _glue(self, before: list[tuple[int, int]], after: list[tuple[int, int]]) -> None:
+        """Move the last atom of before into the first of after, if both fit in one part."""
+        if before and after and self._size(before[-1][0], after[0][1]) <= self._max_bytes:
+            after[0] = (before.pop()[0], after[0][1])
+
+    def _balance(self, atoms: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        """Group neighbouring atoms into the fewest parts that fit, as equal as possible.
+
+        Of the groupings with the fewest parts, the one with the smallest sum of squared
+        sizes wins; on a tie the later part is the shorter one.
+        """
+        # best[n], for the first n atoms: (parts, sum of squares, first atom of last part).
+        best = [(0, 0, 0)]
+        for end in range(1, len(atoms) + 1):
+            choices = []
+            for start in range(end - 1, -1, -1):
+                size = self._size(atoms[start][0], atoms[end - 1][1])
+                if size > self._max_bytes and start < end - 1:
+                    break
+                parts, squares, _ = best[start]
+                choices.append((parts + 1, squares + size * size, start))
+            best.append(min(choices, key=lambda choice: choice[:2]))
+
+        grouped: list[tuple[int, int]] = []
+        end = len(atoms)
+        while end:
+            start = best[end][2]
+            grouped.append((atoms[start][0], atoms[end - 1][1]))
+            end = start
+        return grouped[::-1]
 
     def _size(self, first_line: int, last_line: int) -> int:
         newlines = last_line - first_line

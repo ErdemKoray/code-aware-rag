@@ -3,7 +3,8 @@
 Branch: `sprint/s03-chunker` · Başlangıç: 2026-11-26
 
 ## Durum
-**Kapsamdaki yedi adımın hepsi bitti (2026-11-26).** `chunk_source()` indekslenen her dosyayı chunk'lara ayırıyor; garantiler
+**Kapsamdaki yedi adım ve sonradan istenen dengeli bölme (adım 8) bitti (2026-11-26).** `chunk_source()` indekslenen her
+dosyayı chunk'lara ayırıyor; garantiler
 klonun tamamında kalıcı testle sınanıyor. Push, PR, CI sonucu, merge ve `sprint-03` etiketi sahibinde. Açık kalanlar en altta.
 
 ## Kapsam
@@ -31,7 +32,8 @@ yeni alanlar varsayılan değerle eklenir. Şimdiden boş yer tutucu alan **aç�
 | 6 | `rag chunk-debug` | `dd347f5 feat(cli): add chunk-debug command` |
 | 7a | Klon genelinde kalıcı test (`tests/test_chunking_fastapi.py`) | `9a9439d test(chunking): check chunk guarantees on fastapi` |
 | 7b | İstatistikler (200 bayt altı dahil), README | `3bc5373 docs: record sprint 03 results` |
-| (ek) | `.claude/settings.json`: sahibi proje köküne altı dar ruff kuralı ekledi | `chore: allow ruff on the project root` |
+| (ek) | `.claude/settings.json`: sahibi proje köküne altı dar ruff kuralı ekledi | `ad16a38 chore: allow ruff on the project root` |
+| 8 | Bölme artıklarının giderilmesi: dengeli parçalar (B1), önce/sonra ölçümü | `feat(chunking): balance the parts of split chunks` |
 
 ## S03 öncesi sağlık kontrolü
 
@@ -128,9 +130,14 @@ Betik `data/out/s03_questions.py`; dahil edilen 668 dosya.
 | C11 | Sabit boyutlu karşılaştırma chunker'ı S03 dışında (eval sprint'i) | |
 | S1 | `class_header` bağlamındaki metot listesi yalnızca `def ad` / `async def ad` | Tam imzalar `FastAPI` için 150 KB; parametreler zaten metot chunk'larında |
 | S2 | İç sınıf da başlığı bitirir ve kendi chunk'larını alır; metodu olmayıp iç sınıfı olan sınıf da bölünür | C1'deki "ilk metoda kadar" ile "iç sınıflara aynı kural" çakışmasını çözer |
+| B1 | Bir birim n parçaya bölünürken parçalar mümkün olduğunca **eşit boyutta** olur; kesimler yine ifade/parametre sınırlarında kalır | Küçük chunk'ların en ucuz kaynağı olan bölme artıklarını giderir (S03 sonuçlarından sonra sahip kararı) |
 
-Ertelenen: **çok küçük chunk'ları birleştirme yapılmıyor.** S03 sonunda 200 baytın altındaki chunk sayısı türe göre ölçülüp
-buraya yazılacak; karar sonra.
+**Küçük chunk'lar:** genel birleştirme (yorum başlıkları dahil) **yapılmayacak**. S13 eval'iyle ölçülüp karar verilecek.
+
+### Sahibin yorum onayları (adım 7 raporu sonrası)
+- C3 uygulaması doğru: `if`/`try` bileşik ifadesi bölünmez ve komşu modül koduyla aynı `module` chunk'ında kalabilir.
+- Bölünen birimin sonraki parçalarına `def` satırı eklenmesi gerekmiyor; ortak `context` yeterli.
+- `class_block`'un FastAPI'de hiç oluşmaması nedeniyle yalnızca birim testleriyle sınanması yeterli.
 
 ## Kararlar ve gerekçeleri
 - **Kodu Claude yazar** (çekirdek mantık dahil). Sprint başında plan ve tasarım kararları sunulur, onaydan sonra her adımda
@@ -188,7 +195,8 @@ buraya yazılacak; karar sonra.
 - `chunk_source(source, path, max_chunk_bytes)`; sınır zorunlu parametre (`Settings` ile tek kaynak), `<= 0` ise `ValueError`.
 - `LineSplitter`: aralık sığmıyorsa ağaçta kesilebilecek **en üst düzey** bulunur (modül/blok ifadeleri; decorator ile tanım;
   fonksiyonda parametreler ve gövde; bileşik ifadelerde alt bloklar ve `elif`/`except` vb. dallar). Her dilim aynı yolla
-  özyinelemeli bölünür, sonra komşu parçalar sığdıkça **açgözlü** birleştirilir. Alt sınır yoksa (ör. dev sözlük) satır satır.
+  özyinelemeli bölünür, sonra komşu parçalar sığdıkça birleştirilir (adım 5'te açgözlü; **adım 8'de dengeliyle
+  değişti**). Alt sınır yoksa (ör. dev sözlük) satır satır.
 - Yorum satırları kesim noktası değildir; altlarındaki ifade/parametreyle birlikte gider.
 - Sınıra sığmayan tek satır bölünmez (C7: metin satırların aynısı).
 - Her parça aynı `kind`, `qualname`, `context`'i taşır; `part/part_count` 1 tabanlı. Parçalar baştan/sondan boş satır içermez.
@@ -201,39 +209,74 @@ buraya yazılacak; karar sonra.
   (okuma ortak `_read_source` yardımcısında). Gerçek dosyada elle denendi (`fastapi/encoders.py`).
 - İlk çalıştırmada bir test başarısızdı: beklenen metot boyutunu yanlış hesaplamıştım (32 değil 29 bayt).
 
+### Dengeli bölme (adım 8, B1)
+- İki aşama. **Atomlar:** aralık, hiç kesilmeyen parçalara ayrılır (adım 5'teki kesim noktaları aynen: sığan en büyük
+  sözdizimi birimi, son çare satır). **Gruplama:** komşu atomlar **en az sayıda** parçaya, o sayı içinde **boyut kareleri
+  toplamı en küçük** olacak şekilde toplanır (`_balance`, dinamik programlama; eşitlikte sondaki parça kısa olan). Parça
+  sayısı sabitken toplam boyut neredeyse sabit olduğundan kareler toplamını küçültmek parçaları eşitlemek demektir.
+- Parça sayısı bilerek artırılmaz: `n` en küçük sayıdır, denge o `n` içinde aranır.
+- **Sığan birim kesilmez** kuralı korundu; denge uğruna bir parametre ya da ifade bölünmez.
+- Açgözlü birleştirme, `if x:` / `def f(` başlığını ilk ifadesiyle kendiliğinden bir arada tutuyordu; dengeleme bunu
+  bozabileceği için artık açık kural: bir üst birimin **başlığı** ve **decorator** satırları, sığıyorsa tanıttıkları ilk
+  atoma yapıştırılır (`_glue`). İki testin yapıştırma kapatılınca başarısız olduğu doğrulandı (`data/out/s03_glue_check.py`).
+- Test: birim testlerinde parça sayısı ve kareler toplamı, satır ifadelerinden oluşan bir kaynakta her sınır değeri için
+  kaba kuvvetle bulunan en iyi gruplamayla karşılaştırılır. Açgözlü sonucu bekleyen eski test (`[(1,3),(4,6),(7,9),(10,10)]`)
+  yeni davranışa göre güncellendi.
+
 ## Sonuçlar (S03 sonu)
 
-`data/repos/fastapi` 0.143.0, `max_chunk_bytes = 4000`, 2026-11-26. Betik `data/out/s03_stats.py` (repoya girmedi).
+`data/repos/fastapi` 0.143.0, `max_chunk_bytes = 4000`, 2026-11-26. Betikler `data/out/s03_stats.py`,
+`data/out/s03_balance.py`, `data/out/s03_balance_compare.py` (repoya girmedi). **Önce** = adım 7 (açgözlü birleştirme),
+**sonra** = adım 8 (dengeli bölme).
 
-**668 dosya → 5 737 chunk** (kaynak 680, test 5 057, yani %88 test). Süre 3 çalıştırmada 0,755 / 0,782 / 0,781 sn
-(ortanca **0,781 sn**). 184 birim 725 parçaya bölündü (161 fonksiyon, 22 metot, 1 sınıf). `context` ortanca 66, en çok 570 bayt.
+**668 dosya → 5 737 → 5 604 chunk** (kaynak 680 → 678, test 5 057 → 4 926). Süre (3 çalıştırmanın ortancası)
+**0,78 → 1,33 sn**. `context` ortanca 66, en çok 570 bayt (değişmedi).
 
-| Tür | Kaynak | Test | p50 bayt | p90 bayt | En büyük |
+| Tür | Kaynak (önce → sonra) | Test (önce → sonra) | p50 bayt | p90 bayt | En büyük |
 |---|---|---|---|---|---|
-| `module` | 73 | 816 | 140 | 349 | 2 945 |
-| `function` | 201 | 3 909 | 310 | 2 948 | 4 000 |
-| `class` | 62 | 215 | 79 | 212 | 3 978 |
-| `class_header` | 57 | 49 | 46 | 929 | 2 971 |
-| `method` | 287 | 68 | 622 | 3 728 | 3 999 |
-| `class_block` | 0 | 0 | | | |
+| `module` | 73 → 73 | 816 → 816 | 140 → 140 | 349 → 349 | 2 945 → 2 945 |
+| `function` | 201 → 200 | 3 909 → 3 778 | 310 → 322 | 2 948 → 2 845 | 4 000 → 4 000 |
+| `class` | 62 → 62 | 215 → 215 | 79 → 79 | 212 → 212 | 3 978 → 2 239 |
+| `class_header` | 57 → 57 | 49 → 49 | 46 → 46 | 929 → 929 | 2 971 → 2 971 |
+| `method` | 287 → 286 | 68 → 68 | 622 → 628 | 3 728 → 3 516 | 3 999 → 3 999 |
+| `class_block` | 0 → 0 | 0 → 0 | | | |
 
-### 200 baytın altındaki chunk'lar (birleştirme kararı için; birleştirme **yapılmadı**)
+### Bölünen parçalar
 
-Toplam **2 320 / 5 737 (%40)**: kaynak 178, test 2 142. (100 bayt altı 824, kaynak 82; 50 bayt altı 307, kaynak 21.)
+| Ölçü | Önce | Sonra |
+|---|---|---|
+| Bölünen birim | 184 | 184 |
+| Parça sayısı | 725 | **592** (133 birimde azaldı, hiçbirinde artmadı) |
+| 200 B altı parça | 140 | **8** |
+| 500 / 1 000 / 2 000 B altı parça | 162 / 212 / 275 | 8 / 10 / 13 |
+| Parça boyutu: en küçük / p10 / p50 / p90 / en büyük | 15 / 141 / 3 578 / 3 988 / 4 000 | 44 / 2 279 / 3 164 / 3 954 / 4 000 |
+| Birim içi en küçük/en büyük parça oranı: p10 / p50 | 0,03 / 0,04 | **0,77 / 0,99** |
+| Başlık ya da decorator satırıyla biten parça | 25 | 3 |
+| `test_openapi` / `test_openapi_schema` (application) / `FastAPI.__init__` parçaları | 98 / 16 / 11 | 97 / 15 / 11 |
+
+- **Kalan 8 küçük parça zorunlu:** hepsi testlerdeki `test_openapi*` fonksiyonlarının ilk 1–3 satırı; ardından gelen
+  `assert` ifadesi tek başına sınıra sığıyor (~3 900–4 000 B), ikisi birlikte sığmıyor ve sığan ifade kesilmiyor.
+- Başlıkla biten 3 parçanın 2'si imza ile gövde arasındaki doğal sınır (`) -> ...:`; `jsonable_encoder` ve
+  `openapi/utils.py`), 1'i yukarıdaki zorunlu durumlardan.
+
+### 200 baytın altındaki chunk'lar (önce → sonra)
+
+Toplam **2 320 (%40) → 2 188 (%39)**: kaynak 178 → 176, test 2 142 → 2 012. (100 bayt altı 824 → 814, kaynak 82 → 80;
+50 bayt altı 307 → 302, kaynak 21 → 20.)
 
 | Tür | Türün tamamı | 200 B altı | Kaynak | Test | Bölünmüş birimin parçası | Yalnız yorum |
 |---|---|---|---|---|---|---|
-| `module` | 889 | 668 | 33 | 635 | 0 | 74 |
-| `function` | 4 110 | 1 210 | 26 | 1 184 | 138 | 0 |
-| `class` | 277 | 249 | 37 | 212 | 0 | 0 |
-| `class_header` | 106 | 76 | 28 | 48 | 0 | 0 |
-| `method` | 355 | 117 | 54 | 63 | 2 | 0 |
+| `module` | 889 → 889 | 668 → 668 | 33 → 33 | 635 → 635 | 0 → 0 | 74 → 74 |
+| `function` | 4 110 → 3 978 | 1 210 → 1 080 | 26 → 26 | 1 184 → 1 054 | 138 → 8 | 0 |
+| `class` | 277 → 277 | 249 → 249 | 37 → 37 | 212 → 212 | 0 → 0 | 0 |
+| `class_header` | 106 → 106 | 76 → 76 | 28 → 28 | 48 → 48 | 0 → 0 | 0 |
+| `method` | 355 → 354 | 117 → 115 | 54 → 52 | 63 → 63 | 2 → 0 | 0 |
 | `class_block` | 0 | 0 | 0 | 0 | 0 | 0 |
 
 Okuma notları (karar değil, veri):
 - Küçüklerin %92'si test dosyalarından.
-- 140'ı, açgözlü paketlemeden artan **bölme kuyrukları** (138 fonksiyon, 2 metot parçası): birleştirme düşünülürse en ucuz
-  aday, parçaları dengeli bölmek.
+- Kalan küçüklerin neredeyse tamamı bölme kaynaklı değil: yapının kendisi küçük (kısa test fonksiyonları, tek satırlık
+  sınıflar ve başlıklar).
 - Küçük `module` chunk'larının 74'ü yalnız yorum (bölüm başlıkları); kalanı çoğunlukla import blokları ve kısa ifadeler.
 - `class_header`'ların çoğu küçük (p50 46 bayt): C1 gereği metodu olan her sınıf bölündüğünden başlık sıklıkla tek satır.
 
@@ -244,7 +287,9 @@ ve sınıf metodunun (chunker'dan bağımsız ağaç gezisiyle bulunan) kendi ch
 ortadan kesilmiyor.
 
 ## Doğrulama
-- `uv run python -m pytest`: **346 geçti** (S03 sonu); klon yokken klona bağlı testler atlanır.
+- Adım 8 sonrası `uv run python -m pytest`: **350 geçti** (klon testleri dahil: kayıp/çift satır, atıf, kimlik, sınır,
+  parametre kesimi). İlk `ruff check` bir testte `%` biçimlendirmesini işaretledi; f-string'e çevrildi.
+- `uv run python -m pytest`: **346 geçti** (adım 7 sonu); klon yokken klona bağlı testler atlanır.
 - Adım 5, klon üzerinde (`data/out/s03_step5_check.py`, sınır 4 000): 668 dosya → **5 737 chunk**, 0,80 sn. Kayıp satır 0,
   çift satır 0, atıf farkı 0, yinelenen kimlik 0, **sınırı aşan chunk 0**. Bölünen birim 184 → 725 parça (161 fonksiyon,
   22 metot, 1 sınıf). En çok parça: `test_include_router_defaults_overrides.py::test_openapi` **98**;
@@ -268,10 +313,11 @@ ortadan kesilmiyor.
    (temiz çalışma ağacı) yerinde.
 2. ~~S02 PR'ının (#4) CI sonucu~~ **Kapandı:** yeşil, Node.js 20 uyarısı yok (`sprint-02.md` Açık işler 4).
 3. ~~Metot imzası listesinin biçimi~~ **Karara bağlandı** (S1, S2).
-4. ~~200 bayt altı ölçümü~~ **Yapıldı** (Sonuçlar). **Birleştirme kararı sahibinde.**
+4. ~~200 bayt altı ölçümü~~ **Yapıldı**; bölme artıkları giderildi (adım 8). **Genel birleştirme yapılmayacak; S13
+   eval'iyle ölçülüp karar verilecek.**
 5. Sonraki sprintlere: S04 zenginleştirme alanları; S05 `ast` karşılaştırması, `reports/phase1.md`, golden set v0 (bkz. Kapsam).
 6. Chunk boyutu bayt cinsinden; gerçek token sayısı embedding sprint'inde ölçülecek.
-7. `test_openapi` tek başına 98 chunk üretiyor (C6): retrieval/eval'de test ağırlığı düşürülürken izlenmeli.
+7. `test_openapi` tek başına 97 chunk üretiyor (C6): retrieval/eval'de test ağırlığı düşürülürken izlenmeli.
 8. Bu branch henüz push edilmedi: S03'ün ve P13'te değişen `ci.yml`'in CI sonucu görülmedi.
 
 ## Hakimiyet soruları

@@ -145,7 +145,7 @@ Chunks follow the code structure:
 - a module-level function, with its decorators and the comments directly above it, is one `function` chunk;
 - a class with methods is split into a `class_header` (up to the first method), one `method` chunk per method and `class_block` chunks for code between them; a class without methods stays a single `class` chunk;
 - the remaining module code forms `module` chunks; definitions inside `if` or `try` blocks stay there and are listed as `defines`;
-- a chunk larger than `MAX_CHUNK_BYTES` (default `4000`) is cut into parts (`[1/3]`) between parameters and statements, by lines only as a last resort.
+- a chunk larger than `MAX_CHUNK_BYTES` (default `4000`) is cut into as few parts as possible (`[1/3]`), of similar size, between parameters and statements, by lines only as a last resort.
 
 Every non-blank line belongs to exactly one chunk. Exit codes are the same as for `parse-debug`.
 

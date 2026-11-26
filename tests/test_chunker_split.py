@@ -130,12 +130,73 @@ def test_statement_without_inner_boundaries_is_cut_by_lines():
     assert all(c.size_bytes <= 40 for c in chunks)
 
 
-def test_neighbouring_pieces_are_packed_together():
+def test_neighbouring_pieces_share_parts_of_similar_size():
     source = b"".join(b"x%d = %d\n" % (i, i) for i in range(10))
 
     chunks = chunk_source(source, PATH, 20)
 
-    assert ranges(chunks) == [(1, 3), (4, 6), (7, 9), (10, 10)]
+    # Four parts are the minimum; filling them in order would leave a single line behind.
+    assert ranges(chunks) == [(1, 3), (4, 6), (7, 8), (9, 10)]
+
+
+def test_no_small_tail_is_left_behind():
+    source = b"def f():\n" + b"".join(b"    v%d = %d\n" % (i, i) for i in range(8))
+
+    chunks = chunk_source(source, PATH, 80)
+
+    assert ranges(chunks) == [(1, 5), (6, 9)]
+    assert [c.size_bytes for c in chunks] == [52, 43]
+
+
+def test_parts_are_the_best_grouping_found_by_brute_force():
+    widths = (1, 9, 3, 14, 2, 2, 11, 5)
+    lines = [f"v{i} = {'1' * width}" for i, width in enumerate(widths)]
+    source = "\n".join(lines).encode()
+
+    def score(sizes: list[int]) -> tuple[int, int]:
+        return len(sizes), sum(size * size for size in sizes)
+
+    for limit in range(max(map(len, lines)), len(source) + 1):
+        candidates = []
+        for mask in range(2 ** (len(lines) - 1)):
+            cuts = [i + 1 for i in range(len(lines) - 1) if mask >> i & 1]
+            bounds = zip([0, *cuts], [*cuts, len(lines)], strict=True)
+            sizes = [len("\n".join(lines[start:end])) for start, end in bounds]
+            if max(sizes) <= limit:
+                candidates.append(score(sizes))
+
+        found = score([c.size_bytes for c in chunk_source(source, PATH, limit)])
+
+        assert found == min(candidates), limit
+
+
+def test_header_stays_with_the_first_statement_of_a_split_block():
+    source = (
+        b"first = 1\n"
+        b"if flag:\n"
+        b"    second = 'yyyyyyyyyyyyyyyyyyyy'\n"
+        b"    third = 'zzzzzzzzzzzzzzzzzzzz'\n"
+    )
+
+    # (1, 2), (3, 3), (4, 4) would be more even, but it would strand the "if" line.
+    chunks = chunk_source(source, PATH, 50)
+
+    assert ranges(chunks) == [(1, 1), (2, 3), (4, 4)]
+
+
+def test_decorator_and_nested_header_stay_with_the_code_they_introduce():
+    source = (
+        b"if flag:\n"
+        b"    first = 1\n"
+        b"    @decorator\n"
+        b"    def g():\n"
+        b"        second = 'bbbbbbbbbbbbbbbbbbbb'\n"
+        b"        third = 'cccccccccccccccccccc'\n"
+    )
+
+    chunks = chunk_source(source, PATH, 70)
+
+    assert ranges(chunks) == [(1, 2), (3, 5), (6, 6)]
 
 
 def test_comment_stays_with_the_statement_below_it_at_a_cut():
