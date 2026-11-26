@@ -23,8 +23,9 @@ yeni alanlar varsayılan değerle eklenir. Şimdiden boş yer tutucu alan **aç�
 | # | Adım | Commit |
 |---|---|---|
 | 1 | `Settings.max_chunk_bytes`, `Chunk` veri modeli | `5fb4190 feat(config): add max_chunk_bytes setting`, `feat(chunking): add chunk data model` |
-| 2 | Fonksiyon chunk'ları (`chunking/chunker.py::chunk_source`) | `feat(chunking): chunk module-level functions` |
-| 3 | Sınıfların bölünmesi (`class_header`, `method`, `class`) | karar bekliyor (Açık işler) |
+| 2 | Fonksiyon chunk'ları (`chunking/chunker.py::chunk_source`) | `245fea8 feat(chunking): chunk module-level functions` |
+| (ek) | `.claude/settings.json`: geniş `ruff*` izinleri sahibi tarafından kaldırıldı | `7493ab6 chore: narrow ruff permissions to the project root` |
+| 3 | Sınıfların bölünmesi (`class_header`, `method`, `class`, iç sınıflar) | `feat(chunking): split classes into header and members` |
 | 4 | Modül düzeyi bloklar, sınıf blokları, yorumların bağlanması, bileşik ifadeler | bekliyor |
 | 5 | Sınırı aşan parçaların bölünmesi | bekliyor |
 | 6 | `rag chunk-debug` | bekliyor |
@@ -123,6 +124,8 @@ Betik `data/out/s03_questions.py`; dahil edilen 668 dosya.
 | C9 | Kimlik `(path, qualname, kind, text)` özeti, birebir aynılara sıra eki; satır numarası kimlikte yok | Kod kayınca kimlik değişmesin (artımlı indeksleme) |
 | C10 | `has_error` olan dosya yine chunk'lanır ve işaretlenir, istisna yok | |
 | C11 | Sabit boyutlu karşılaştırma chunker'ı S03 dışında (eval sprint'i) | |
+| S1 | `class_header` bağlamındaki metot listesi yalnızca `def ad` / `async def ad` | Tam imzalar `FastAPI` için 150 KB; parametreler zaten metot chunk'larında |
+| S2 | İç sınıf da başlığı bitirir ve kendi chunk'larını alır; metodu olmayıp iç sınıfı olan sınıf da bölünür | C1'deki "ilk metoda kadar" ile "iç sınıflara aynı kural" çakışmasını çözer |
 
 Ertelenen: **çok küçük chunk'ları birleştirme yapılmıyor.** S03 sonunda 200 baytın altındaki chunk sayısı türe göre ölçülüp
 buraya yazılacak; karar sonra.
@@ -162,6 +165,13 @@ buraya yazılacak; karar sonra.
 - Metin kaynak baytlarının satır dilimidir; CRLF dosyalarda `\r` korunur (C7). Geçersiz UTF-8 baytları `U+FFFD` olur.
 - Adı çıkarılamayan (hata kurtarma sonucu) tanımlar fonksiyon chunk'ı olmaz; 4. adımda modül koduna düşecek.
 
+### Sınıfların bölünmesi (adım 3)
+- "Üye" = sınıf gövdesinin doğrudan çocuğu olan metot ya da iç sınıf. Bileşik ifade içindeki tanımlar üye değildir (C3).
+- Başlık: sınıfın dış node'unun ilk satırından ilk üyeden önceki son dolu satıra kadar.
+- İlk üye başlığın `:` satırında başlıyorsa (`class A: def f(self): ...`) sınıf bölünmez: bir satır tek bir chunk'a ait olabilir.
+- Metot bağlamı: `path`, `Sınıf.metot`, doğrudan sınıfın `class ...:` imzası (decorator'sız, çok satırlıysa olduğu gibi).
+  Başlık bağlamı: `path`, ad, metot listesi.
+
 ## Doğrulama
 - `uv run python -m pytest`: **152 geçti** (sağlık kontrolü düzeltmelerinden sonra); `ruff check` ve `ruff format --check` temiz.
 - Adım 2, klon üzerinde (betik `data/out/s03_step2_check.py`): istisna yok; **3 647 fonksiyon chunk'ı** (kaynak 169,
@@ -172,5 +182,5 @@ buraya yazılacak; karar sonra.
 ## Açık işler
 1. P10: `.claude/settings.json`'daki `ruff*` izninin daraltılması (sahibi yapacak; kurallar sohbette verildi). Yakalayıcı test eklendi.
 2. ~~S02 PR'ının (#4) CI sonucu~~ **Kapandı:** yeşil, Node.js 20 uyarısı yok (`sprint-02.md` Açık işler 4).
-3. **Karar gerekli (adım 3):** `class_header` bağlamındaki metot imzası listesinin biçimi (tam imza 150 KB'a çıkıyor).
+3. ~~Metot imzası listesinin biçimi~~ **Karara bağlandı** (S1, S2).
 4. S03 sonunda 200 bayt altı chunk sayısını türe göre ölç; birleştirme kararı sonra.
