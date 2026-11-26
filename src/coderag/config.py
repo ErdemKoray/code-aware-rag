@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     # Scanner: .py files larger than this many bytes are excluded as TOO_LARGE.
     max_file_size_bytes: int = Field(default=500_000, gt=0)
 
+    # Chunker: a chunk whose text is longer than this many UTF-8 bytes gets split.
+    max_chunk_bytes: int = Field(default=4_000, gt=0)
+
 
 def require(value: SecretStr | None, env_name: str) -> str:
     """Return the secret as plain text, or fail with a one-line message."""
