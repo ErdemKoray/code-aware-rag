@@ -1,9 +1,13 @@
+from functools import partial
+
 import pytest
 
-from coderag.chunking.chunker import chunk_source
+from coderag.chunking import chunker
 from coderag.chunking.model import Chunk, ChunkKind, make_chunk_id
 
 PATH = "pkg/mod.py"
+# Large enough that nothing is split here; splitting has its own tests.
+chunk_source = partial(chunker.chunk_source, max_chunk_bytes=4_000)
 
 
 def functions(source: bytes, path: str = PATH) -> list[Chunk]:

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from tree_sitter import Node
 
 from coderag.chunking.model import Chunk, ChunkKind, make_chunk_id
+from coderag.chunking.split import LineSplitter
 from coderag.parsing.python import line_range, parse
 from coderag.scan import is_test_path
 
@@ -91,11 +92,14 @@ class _FileChunks:
     member takes its own line range, and the lines left between members become blocks.
     """
 
-    def __init__(self, source: bytes, path: str, root: Node, has_error: bool) -> None:
+    def __init__(
+        self, source: bytes, path: str, root: Node, has_error: bool, max_chunk_bytes: int
+    ) -> None:
         self._source = source
         # Split on "\n" only, which is how tree-sitter counts rows.
         self._lines = source.split(b"\n")
         self._comment_lines = _comment_only_lines(root, self._lines)
+        self._splitter = LineSplitter(root, self._lines, self._comment_lines, max_chunk_bytes)
         self._path = path
         self._has_error = has_error
         self._is_test = is_test_path(path)
@@ -109,58 +113,46 @@ class _FileChunks:
         first_line: int,
         last_line: int,
         context: tuple[str, ...],
-        defined_names: tuple[str, ...] = (),
+        unchunked: list[tuple[str, int]] | None = None,
     ) -> None:
-        raw = b"\n".join(self._lines[first_line - 1 : last_line])
-        text = raw.decode("utf-8", errors="replace")
-        self._seen[(kind, qualname, text)] += 1
-        self.chunks.append(
-            Chunk(
-                id=make_chunk_id(
-                    self._path, qualname, kind, text, self._seen[(kind, qualname, text)]
-                ),
-                path=self._path,
-                kind=kind,
-                qualname=qualname,
-                start_line=first_line,
-                end_line=last_line,
-                text=text,
-                context="\n".join(context),
-                is_test=self._is_test,
-                has_error=self._has_error,
-                defined_names=defined_names,
-            )
-        )
+        """Add the unit on lines first_line..last_line, as several parts if it is too big.
 
-    def add_block(
-        self,
-        kind: ChunkKind,
-        qualname: str | None,
-        first_line: int,
-        last_line: int,
-        context: tuple[str, ...],
-        unchunked: list[tuple[str, int]],
-    ) -> None:
-        """Add the lines first_line..last_line without blank edges, if any are left.
-
-        unchunked lists (name, line) of definitions that have no chunk of their own; the
-        ones inside this block are recorded in its defined_names.
+        Blank edges are dropped, and a range of blank lines adds nothing. unchunked lists
+        (name, line) of definitions that have no chunk of their own; each part records the
+        ones that start inside it in its defined_names.
         """
-        while first_line <= last_line and not self._lines[first_line - 1].strip():
-            first_line += 1
-        while last_line >= first_line and not self._lines[last_line - 1].strip():
-            last_line -= 1
-        if first_line > last_line:
-            return
-        names = tuple(name for name, line in unchunked if first_line <= line <= last_line)
-        self.add(kind, qualname, first_line, last_line, context, names)
+        parts = self._splitter.split(first_line, last_line)
+        for number, (part_first, part_last) in enumerate(parts, start=1):
+            raw = b"\n".join(self._lines[part_first - 1 : part_last])
+            text = raw.decode("utf-8", errors="replace")
+            self._seen[(kind, qualname, text)] += 1
+            occurrence = self._seen[(kind, qualname, text)]
+            self.chunks.append(
+                Chunk(
+                    id=make_chunk_id(self._path, qualname, kind, text, occurrence),
+                    path=self._path,
+                    kind=kind,
+                    qualname=qualname,
+                    start_line=part_first,
+                    end_line=part_last,
+                    text=text,
+                    context="\n".join(context),
+                    is_test=self._is_test,
+                    has_error=self._has_error,
+                    defined_names=tuple(
+                        name for name, line in unchunked or () if part_first <= line <= part_last
+                    ),
+                    part=number,
+                    part_count=len(parts),
+                )
+            )
 
     def add_module(self, root: Node) -> None:
         members = self._members(_definitions(root), floor=0)
         unchunked = self._unchunked(root, members, prefix="")
         next_line = 1
         for member in members:
-            self.add_block(
+            self.add(
                 ChunkKind.MODULE, None, next_line, member.first_line - 1, (self._path,), unchunked
             )
             name = member.definition.name
@@ -175,9 +167,7 @@ class _FileChunks:
                     (self._path, name),
                 )
             next_line = member.last_line + 1
-        self.add_block(
-            ChunkKind.MODULE, None, next_line, len(self._lines), (self._path,), unchunked
-        )
+        self.add(ChunkKind.MODULE, None, next_line, len(self._lines), (self._path,), unchunked)
 
     def add_class(self, cls: _Member, qualname: str) -> None:
         """A class with methods or inner classes is split; any other class stays whole."""
@@ -191,7 +181,7 @@ class _FileChunks:
         unchunked = [] if body is None else self._unchunked(body, members, f"{qualname}.")
 
         if not members:
-            self.add_block(
+            self.add(
                 ChunkKind.CLASS,
                 qualname,
                 cls.first_line,
@@ -205,7 +195,7 @@ class _FileChunks:
         methods = tuple(
             _method_label(member.definition) for member in members if not member.definition.is_class
         )
-        self.add_block(
+        self.add(
             ChunkKind.CLASS_HEADER,
             qualname,
             cls.first_line,
@@ -216,7 +206,7 @@ class _FileChunks:
         block_context = (self._path, qualname, signature)
         next_line = members[0].first_line
         for member in members:
-            self.add_block(
+            self.add(
                 ChunkKind.CLASS_BLOCK,
                 qualname,
                 next_line,
@@ -236,7 +226,7 @@ class _FileChunks:
                     (self._path, member_name, signature),
                 )
             next_line = member.last_line + 1
-        self.add_block(
+        self.add(
             ChunkKind.CLASS_BLOCK, qualname, next_line, cls.last_line, block_context, unchunked
         )
 
@@ -268,14 +258,17 @@ class _FileChunks:
         ]
 
 
-def chunk_source(source: bytes, path: str) -> tuple[Chunk, ...]:
+def chunk_source(source: bytes, path: str, max_chunk_bytes: int) -> tuple[Chunk, ...]:
     """Split one file into chunks, in source order. path is repo-relative, "/" separated.
 
-    Every non-blank line belongs to exactly one chunk. Never raises on bad syntax.
-    Work in progress: chunks larger than the size limit are not split yet.
+    Every non-blank line belongs to exactly one chunk. A chunk's text is at most
+    max_chunk_bytes of UTF-8, unless it is a single longer line. Never raises on bad
+    syntax; raises ValueError for a non-positive limit.
     """
+    if max_chunk_bytes <= 0:
+        raise ValueError("max_chunk_bytes must be > 0")
     result = parse(source)
     root = result.tree.root_node
-    file_chunks = _FileChunks(source, path, root, result.has_error)
+    file_chunks = _FileChunks(source, path, root, result.has_error, max_chunk_bytes)
     file_chunks.add_module(root)
     return tuple(file_chunks.chunks)

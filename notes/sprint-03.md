@@ -26,8 +26,8 @@ yeni alanlar varsayılan değerle eklenir. Şimdiden boş yer tutucu alan **aç�
 | 2 | Fonksiyon chunk'ları (`chunking/chunker.py::chunk_source`) | `245fea8 feat(chunking): chunk module-level functions` |
 | (ek) | `.claude/settings.json`: geniş `ruff*` izinleri sahibi tarafından kaldırıldı | `7493ab6 chore: narrow ruff permissions to the project root` |
 | 3 | Sınıfların bölünmesi (`class_header`, `method`, `class`, iç sınıflar) | `0e4c93a feat(chunking): split classes into header and members` |
-| 4 | Modül düzeyi bloklar, sınıf blokları, yorumların bağlanması, bileşik ifadeler | `feat(chunking): add module and class blocks` |
-| 5 | Sınırı aşan parçaların bölünmesi | bekliyor |
+| 4 | Modül düzeyi bloklar, sınıf blokları, yorumların bağlanması, bileşik ifadeler | `cdf82e1 feat(chunking): add module and class blocks` |
+| 5 | Sınırı aşan parçaların bölünmesi (`chunking/split.py`) | `feat(chunking): split oversized chunks` |
 | 6 | `rag chunk-debug` | bekliyor |
 | 7 | Klon genelinde kalıcı test, istatistikler (200 bayt altı chunk sayısı dahil), README | bekliyor |
 
@@ -182,7 +182,23 @@ buraya yazılacak; karar sonra.
 - `defined_names`: bloğun içinde kalıp kendi chunk'ı olmayan en dış tanımlar (pratikte `if`/`try` içindekiler, C3). Sınıf
   içinde `Sınıf.ad` biçiminde. Bileşik ifade komşu modül koduyla aynı `module` chunk'ına girer ve bölünmez (boyut sınırı hariç).
 
+### Boyut bölme (adım 5)
+- `chunk_source(source, path, max_chunk_bytes)`; sınır zorunlu parametre (`Settings` ile tek kaynak), `<= 0` ise `ValueError`.
+- `LineSplitter`: aralık sığmıyorsa ağaçta kesilebilecek **en üst düzey** bulunur (modül/blok ifadeleri; decorator ile tanım;
+  fonksiyonda parametreler ve gövde; bileşik ifadelerde alt bloklar ve `elif`/`except` vb. dallar). Her dilim aynı yolla
+  özyinelemeli bölünür, sonra komşu parçalar sığdıkça **açgözlü** birleştirilir. Alt sınır yoksa (ör. dev sözlük) satır satır.
+- Yorum satırları kesim noktası değildir; altlarındaki ifade/parametreyle birlikte gider.
+- Sınıra sığmayan tek satır bölünmez (C7: metin satırların aynısı).
+- Her parça aynı `kind`, `qualname`, `context`'i taşır; `part/part_count` 1 tabanlı. Parçalar baştan/sondan boş satır içermez.
+  `defined_names` adın başladığı parçaya yazılır. Aynı kurallar `module`, `class_header`, `class_block`, `class` için de geçerli.
+
 ## Doğrulama
+- Adım 5, klon üzerinde (`data/out/s03_step5_check.py`, sınır 4 000): 668 dosya → **5 737 chunk**, 0,80 sn. Kayıp satır 0,
+  çift satır 0, atıf farkı 0, yinelenen kimlik 0, **sınırı aşan chunk 0**. Bölünen birim 184 → 725 parça (161 fonksiyon,
+  22 metot, 1 sınıf). En çok parça: `test_include_router_defaults_overrides.py::test_openapi` **98**;
+  `test_application.py::test_openapi_schema` 16; `FastAPI.__init__` 11 (parçalar parametre sınırlarında başlıyor).
+- Adım 5 testlerinde ilk çalıştırmada 3 test başarısız oldu: hata testlerdeki bayt hesabımdaydı (beklenen dilim sınırdan
+  uzundu), kodda değil; sınırlar düzeltildi.
 - Adım 4, klon üzerinde (`data/out/s03_step4_check.py`): 668 dosya → **5 196 chunk** (`function` 3 647, `module` 889,
   `method` 278, `class` 276, `class_header` 106, **`class_block` 0**: FastAPI'de metotlar arasında sınıf kodu yok).
   Chunk'sız dolu satır **0**, iki chunk'ta geçen satır **0**, atıf farkı 0, yinelenen kimlik 0. `defined_names` taşıyan
