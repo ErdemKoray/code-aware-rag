@@ -3,8 +3,8 @@
 Branch: `sprint/s03-chunker` · Başlangıç: 2026-11-26
 
 ## Durum
-Sağlık kontrolü düzeltmeleri bitti, planlama ölçümleri yapıldı, **plan ve tasarım kararları onaylandı (2026-11-26).**
-Uygulama adım adım sürüyor (bkz. Adımlar).
+**Kapsamdaki yedi adımın hepsi bitti (2026-11-26).** `chunk_source()` indekslenen her dosyayı chunk'lara ayırıyor; garantiler
+klonun tamamında kalıcı testle sınanıyor. Push, PR, CI sonucu, merge ve `sprint-03` etiketi sahibinde. Açık kalanlar en altta.
 
 ## Kapsam
 Bu sprint, **orijinal sprint planındaki S03–S05'in** şu parçalarını karşılar: chunk birimleri, sınıfların ele alınışı ve
@@ -22,14 +22,14 @@ yeni alanlar varsayılan değerle eklenir. Şimdiden boş yer tutucu alan **aç�
 ## Adımlar
 | # | Adım | Commit |
 |---|---|---|
-| 1 | `Settings.max_chunk_bytes`, `Chunk` veri modeli | `5fb4190 feat(config): add max_chunk_bytes setting`, `feat(chunking): add chunk data model` |
+| 1 | `Settings.max_chunk_bytes`, `Chunk` veri modeli | `5fb4190 feat(config): add max_chunk_bytes setting`, `ff755d3 feat(chunking): add chunk data model` |
 | 2 | Fonksiyon chunk'ları (`chunking/chunker.py::chunk_source`) | `245fea8 feat(chunking): chunk module-level functions` |
 | (ek) | `.claude/settings.json`: geniş `ruff*` izinleri sahibi tarafından kaldırıldı | `7493ab6 chore: narrow ruff permissions to the project root` |
 | 3 | Sınıfların bölünmesi (`class_header`, `method`, `class`, iç sınıflar) | `0e4c93a feat(chunking): split classes into header and members` |
 | 4 | Modül düzeyi bloklar, sınıf blokları, yorumların bağlanması, bileşik ifadeler | `cdf82e1 feat(chunking): add module and class blocks` |
 | 5 | Sınırı aşan parçaların bölünmesi (`chunking/split.py`) | `c5b457a feat(chunking): split oversized chunks` |
 | 6 | `rag chunk-debug` | `dd347f5 feat(cli): add chunk-debug command` |
-| 7a | Klon genelinde kalıcı test (`tests/test_chunking_fastapi.py`) | `test(chunking): check chunk guarantees on fastapi` |
+| 7a | Klon genelinde kalıcı test (`tests/test_chunking_fastapi.py`) | `9a9439d test(chunking): check chunk guarantees on fastapi` |
 | 7b | İstatistikler (200 bayt altı dahil), README | `docs: record sprint 03 results` |
 
 ## S03 öncesi sağlık kontrolü
@@ -200,7 +200,50 @@ buraya yazılacak; karar sonra.
   (okuma ortak `_read_source` yardımcısında). Gerçek dosyada elle denendi (`fastapi/encoders.py`).
 - İlk çalıştırmada bir test başarısızdı: beklenen metot boyutunu yanlış hesaplamıştım (32 değil 29 bayt).
 
+## Sonuçlar (S03 sonu)
+
+`data/repos/fastapi` 0.143.0, `max_chunk_bytes = 4000`, 2026-11-26. Betik `data/out/s03_stats.py` (repoya girmedi).
+
+**668 dosya → 5 737 chunk** (kaynak 680, test 5 057, yani %88 test). Süre 3 çalıştırmada 0,755 / 0,782 / 0,781 sn
+(ortanca **0,781 sn**). 184 birim 725 parçaya bölündü (161 fonksiyon, 22 metot, 1 sınıf). `context` ortanca 66, en çok 570 bayt.
+
+| Tür | Kaynak | Test | p50 bayt | p90 bayt | En büyük |
+|---|---|---|---|---|---|
+| `module` | 73 | 816 | 140 | 349 | 2 945 |
+| `function` | 201 | 3 909 | 310 | 2 948 | 4 000 |
+| `class` | 62 | 215 | 79 | 212 | 3 978 |
+| `class_header` | 57 | 49 | 46 | 929 | 2 971 |
+| `method` | 287 | 68 | 622 | 3 728 | 3 999 |
+| `class_block` | 0 | 0 | | | |
+
+### 200 baytın altındaki chunk'lar (birleştirme kararı için; birleştirme **yapılmadı**)
+
+Toplam **2 320 / 5 737 (%40)**: kaynak 178, test 2 142. (100 bayt altı 824, kaynak 82; 50 bayt altı 307, kaynak 21.)
+
+| Tür | Türün tamamı | 200 B altı | Kaynak | Test | Bölünmüş birimin parçası | Yalnız yorum |
+|---|---|---|---|---|---|---|
+| `module` | 889 | 668 | 33 | 635 | 0 | 74 |
+| `function` | 4 110 | 1 210 | 26 | 1 184 | 138 | 0 |
+| `class` | 277 | 249 | 37 | 212 | 0 | 0 |
+| `class_header` | 106 | 76 | 28 | 48 | 0 | 0 |
+| `method` | 355 | 117 | 54 | 63 | 2 | 0 |
+| `class_block` | 0 | 0 | 0 | 0 | 0 | 0 |
+
+Okuma notları (karar değil, veri):
+- Küçüklerin %92'si test dosyalarından.
+- 140'ı, açgözlü paketlemeden artan **bölme kuyrukları** (138 fonksiyon, 2 metot parçası): birleştirme düşünülürse en ucuz
+  aday, parçaları dengeli bölmek.
+- Küçük `module` chunk'larının 74'ü yalnız yorum (bölüm başlıkları); kalanı çoğunlukla import blokları ve kısa ifadeler.
+- `class_header`'ların çoğu küçük (p50 46 bayt): C1 gereği metodu olan her sınıf bölündüğünden başlık sıklıkla tek satır.
+
+### Kalıcı klon testi (`tests/test_chunking_fastapi.py`, klon yoksa `skip`)
+Her dolu satır tam olarak bir chunk'ta; metin atıf satırlarıyla birebir; sınırı aşan çok satırlı chunk yok; kimlikler repo
+genelinde benzersiz; sözdizimi işareti yok; parçalar ardışık ve eksiksiz; iki çalıştırma aynı; modül düzeyindeki her fonksiyonun
+ve sınıf metodunun (chunker'dan bağımsız ağaç gezisiyle bulunan) kendi chunk'ı var; sınırın yarısından küçük hiçbir parametre
+ortadan kesilmiyor.
+
 ## Doğrulama
+- `uv run python -m pytest`: **346 geçti** (S03 sonu); klon yokken klona bağlı testler atlanır.
 - Adım 5, klon üzerinde (`data/out/s03_step5_check.py`, sınır 4 000): 668 dosya → **5 737 chunk**, 0,80 sn. Kayıp satır 0,
   çift satır 0, atıf farkı 0, yinelenen kimlik 0, **sınırı aşan chunk 0**. Bölünen birim 184 → 725 parça (161 fonksiyon,
   22 metot, 1 sınıf). En çok parça: `test_include_router_defaults_overrides.py::test_openapi` **98**;
@@ -219,7 +262,19 @@ buraya yazılacak; karar sonra.
 - Adım 2 sonrası `uv run python -m pytest`: **210 geçti**.
 
 ## Açık işler
-1. P10: `.claude/settings.json`'daki `ruff*` izninin daraltılması (sahibi yapacak; kurallar sohbette verildi). Yakalayıcı test eklendi.
+1. P10: sahibi geniş `ruff*` izinlerini kaldırdı (`7493ab6`). Önerilen dar kurallar `settings.json`'da **yok**; gitignore'daki
+   `settings.local.json`'daki kurallar dışında her ruff çağrısı onay ister. İstenirse dar kurallar sahibi tarafından eklenebilir.
+   Yakalayıcı test (temiz çalışma ağacı) yerinde.
 2. ~~S02 PR'ının (#4) CI sonucu~~ **Kapandı:** yeşil, Node.js 20 uyarısı yok (`sprint-02.md` Açık işler 4).
 3. ~~Metot imzası listesinin biçimi~~ **Karara bağlandı** (S1, S2).
-4. S03 sonunda 200 bayt altı chunk sayısını türe göre ölç; birleştirme kararı sonra.
+4. ~~200 bayt altı ölçümü~~ **Yapıldı** (Sonuçlar). **Birleştirme kararı sahibinde.**
+5. Sonraki sprintlere: S04 zenginleştirme alanları; S05 `ast` karşılaştırması, `reports/phase1.md`, golden set v0 (bkz. Kapsam).
+6. Chunk boyutu bayt cinsinden; gerçek token sayısı embedding sprint'inde ölçülecek.
+7. `test_openapi` tek başına 98 chunk üretiyor (C6): retrieval/eval'de test ağırlığı düşürülürken izlenmeli.
+8. Bu branch henüz push edilmedi: S03'ün ve P13'te değişen `ci.yml`'in CI sonucu görülmedi.
+
+## Hakimiyet soruları
+- Her dolu satırın tam olarak bir chunk'ta olması yapının neresinden geliyor?
+- Bir metodun üstündeki yorum satırı hangi chunk'a gider; arada boş satır olursa ne değişir?
+- 4 000 bayttan büyük bir fonksiyon hangi sırayla bölünür, "son çare" ne zaman devreye girer?
+- Chunk kimliğinde neden satır numarası yok, aynı metin iki kez geçerse ne olur?

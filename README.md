@@ -4,7 +4,7 @@
 
 A retrieval-augmented generation system that answers questions about a Python codebase with precise `file:line` citations.
 
-> **Status:** Early development. The file scanner and the tree-sitter parser work; the structure-aware chunker is being built. Indexing, retrieval and answering are not implemented yet.
+> **Status:** Early development. The file scanner, the tree-sitter parser and the structure-aware chunker work; chunk metadata and validation of the chunker are next. Indexing, retrieval and answering are not implemented yet.
 
 ## Why
 
@@ -122,6 +122,33 @@ class_definition       L19-23  name=ParamTypes
 
 A file with syntax errors is still printed, with `has_error: True` and exit code 0. The exit code is 2 if the file cannot be read.
 
+### `rag chunk-debug FILE`
+
+Splits one file into chunks and prints each chunk's kind, line range, size and name.
+
+```bash
+uv run rag chunk-debug data/repos/fastapi/fastapi/encoders.py
+```
+
+```text
+has_error: False
+chunks: 9 (max size: 4000 bytes)
+module    L1-49     1307 B  defines: Color, PyExtraColor
+function  L52-54     111 B  isoformat
+...
+function  L129-218  2777 B  jsonable_encoder  [1/3]
+...
+```
+
+Chunks follow the code structure:
+
+- a module-level function, with its decorators and the comments directly above it, is one `function` chunk;
+- a class with methods is split into a `class_header` (up to the first method), one `method` chunk per method and `class_block` chunks for code between them; a class without methods stays a single `class` chunk;
+- the remaining module code forms `module` chunks; definitions inside `if` or `try` blocks stay there and are listed as `defines`;
+- a chunk larger than `MAX_CHUNK_BYTES` (default `4000`) is cut into parts (`[1/3]`) between parameters and statements, by lines only as a last resort.
+
+Every non-blank line belongs to exactly one chunk. Exit codes are the same as for `parse-debug`.
+
 `rag index`, `rag search` and `rag ask` are not implemented yet.
 
 ## Target repository
@@ -141,6 +168,10 @@ src/coderag/
   scan.py         # finds the .py files to index
   parsing/
     python.py     # tree-sitter parser and line ranges
+  chunking/
+    model.py      # the Chunk record and its ids
+    chunker.py    # splits a file along its structure
+    split.py      # cuts oversized chunks at syntax boundaries
 tests/            # unit tests (those that need the clone are skipped without it)
 notes/            # sprint notes and design decisions (in Turkish)
 data/repos/       # target repositories (not committed)
