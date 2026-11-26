@@ -4,7 +4,7 @@ Branch: `sprint/s02-parser` · Başlangıç: 2026-11-26 · Son güncelleme: 2026
 
 ## Durum
 **Sprint tamamlandı:** kapsamdaki işlerin hepsi yapıldı, PR #4 ile `main`'e merge edildi (`4b6f577`) ve `sprint-02`
-etiketlendi. PR'ın CI sonucunun teyidi açık (Açık işler 4).
+etiketlendi. PR'ın CI'ı yeşil geçti (Açık işler 4).
 
 ## Amaç
 Python kaynağını tree-sitter ile sözdizimi ağacına çevirmek; ağaçta hata olup olmadığını bildirmek.
@@ -83,7 +83,7 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
 1. **S03'e devredilen sorular** (ayrıntı `notes/tree-sitter.md` bölüm 6 ve 11): modül düzeyindeki `if_statement` (23) ve `try_statement` (18) içindeki tanımlar nasıl ele alınacak? Bunların içinde kaç tanım olduğu **ölçülmedi**.
 2. `has_error=False` her zaman "geçerli kod" demek değil (gövdesiz `def f():`). Chunker'ın buna güvenmemesi gerek.
 3. Python dışı kodlama bildirimi (`# -*- coding: latin-1 -*-`) olan dosya FastAPI'de çıkmadı; sorun gözlenmedi.
-4. **CI sonucu teyit bekliyor:** branch push edildi ve PR #4 merge edildi. Sahibin 2026-11-26 tarihli mesajında "CI yeşil geçti" yazıyordu, ancak aynı satırda "Bu satırı Actions sonucuna göre düzelt" notu da duruyordu; bu yüzden doğrulanmış sayılmadı. Teyit edilecekler: 3.12 ve 3.14 matrisinin yeşil olması (`tree-sitter` kurulumu dahil) ve 2 klon testinin CI'da atlanması. Actions sonucu Claude oturumundan görülemiyor.
+4. ~~CI sonucu~~ **Kapandı (2026-11-26):** S02 PR'ının (#4) CI'ı yeşil geçti ve Node.js 20 uyarısı çıkmadı (sahibi Actions'tan teyit etti; sonucu Claude oturumundan görmedim). Yani `tree-sitter` paketleri Linux'ta kuruldu ve aksiyon yükseltmesi uyarıyı giderdi. CI'da klon olmadığı için, yeşil sonuç klon testlerinin atlandığı anlamına gelir (çıktı satırlarını ayrıca incelemedim).
 
 ## Hakimiyet soruları
 - `has_error=False` neden "kod geçerli" anlamına gelmez? Bir örnek ver.

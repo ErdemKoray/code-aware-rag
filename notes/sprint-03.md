@@ -88,5 +88,5 @@ Gruplar: **kaynak** = scan'in dahil edip test saymadığı 52 dosya; **test** = 
 
 ## Açık işler
 1. P10'un kalan boşluğu: klona açık yolla ruff çalıştırmayı engellemek (seçenekler sahibine sunuldu).
-2. S02 PR'ının (#4) CI sonucu teyit edilecek (ayrıntı `sprint-02.md` Açık işler 4).
+2. ~~S02 PR'ının (#4) CI sonucu~~ **Kapandı:** yeşil, Node.js 20 uyarısı yok (`sprint-02.md` Açık işler 4).
 3. Chunker planının ve tasarım kararlarının onayı.
