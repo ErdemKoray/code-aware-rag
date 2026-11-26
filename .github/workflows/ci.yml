@@ -18,7 +18,7 @@ jobs:
       # Overrides the repo's .python-version for every uv command in this job.
       UV_PYTHON: ${{ matrix.python-version }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: astral-sh/setup-uv@v7
 
