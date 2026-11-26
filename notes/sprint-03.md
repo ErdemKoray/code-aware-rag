@@ -23,6 +23,7 @@ her düzeltme grubu ayrı commit olarak uygulanıyor.
 | P13 | CI: `push` yalnızca `main`; `timeout-minutes: 10`; `concurrency` (yalnızca PR çalışmaları iptal edilir, `main` çalışmaları tamamlanır); yanlış yorum düzeltildi. Yerelde çalıştırılamaz, doğrulaması PR'ın CI'ında | `ci: limit push trigger and add timeout and concurrency` |
 | LICENSE | MIT, "Copyright (c) 2026 Erdem Koray" | `docs: add mit license` |
 | P11 | README: durum ve roadmap, çalışan komutlar (`scan`, `parse-debug`), proje yapısı, düzeltilmiş clone/checkout komutları, Uygulama Denetimi notu, lisans. Komutlar standart biçimde (`uv run rag`, `uv run pytest`); bu biçimler bu makinede engelli olduğu için burada çalıştırılarak denenmedi | `docs: update readme` |
+| P12 | Sprint notları: eski/çelişen cümleler düzeltildi, `sprint-00`'a "Açık işler", `sprint-02`'ye "Durum" ve "Hakimiyet soruları" açıldı. Mevcut hakimiyet sorularına dokunulmadı, hiçbirine cevap yazılmadı | `docs: tidy sprint notes` |
 
 ## Kararlar ve gerekçeleri
 - **Kodu Claude yazar** (çekirdek mantık dahil). Sprint başında plan ve tasarım kararları sunulur, onaydan sonra her adımda
@@ -43,3 +44,4 @@ her düzeltme grubu ayrı commit olarak uygulanıyor.
 
 ## Açık işler
 1. P10'un kalan boşluğu: klona açık yolla ruff çalıştırmayı engellemek (seçenekler sahibine sunuldu).
+2. S02 PR'ının (#4) CI sonucu teyit edilecek (ayrıntı `sprint-02.md` Açık işler 4).
