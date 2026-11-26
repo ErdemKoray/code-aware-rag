@@ -23,7 +23,7 @@ yeni alanlar varsayılan değerle eklenir. Şimdiden boş yer tutucu alan **aç�
 | # | Adım | Commit |
 |---|---|---|
 | 1 | `Settings.max_chunk_bytes`, `Chunk` veri modeli | `5fb4190 feat(config): add max_chunk_bytes setting`, `feat(chunking): add chunk data model` |
-| 2 | Fonksiyon chunk'ları | bekliyor |
+| 2 | Fonksiyon chunk'ları (`chunking/chunker.py::chunk_source`) | `feat(chunking): chunk module-level functions` |
 | 3 | Sınıfların bölünmesi (`class_header`, `method`, `class`) | karar bekliyor (Açık işler) |
 | 4 | Modül düzeyi bloklar, sınıf blokları, yorumların bağlanması, bileşik ifadeler | bekliyor |
 | 5 | Sınırı aşan parçaların bölünmesi | bekliyor |
@@ -154,8 +154,20 @@ buraya yazılacak; karar sonra.
 - `make_chunk_id`: `sha256(path \0 qualname \0 kind \0 text)`'in ilk 16 hex karakteri (64 bit); birebir aynı chunk'larda
   kaynak sırasına göre `-2`, `-3` eki (C9).
 
+### Fonksiyon chunk'ları (adım 2)
+- `chunk_source(source, path)` şimdilik yalnızca modül düzeyindeki fonksiyonları verir; sınıflar, modül kodu, yorum
+  bağlama ve boyut bölme sonraki adımlarda.
+- Aralık dış node'dan alınır, böylece decorator'lar chunk'a dahildir. İç fonksiyonlar ebeveyninde kalır.
+- `context` biçimi: satır başına bir öğe; fonksiyon için `path` ve ad.
+- Metin kaynak baytlarının satır dilimidir; CRLF dosyalarda `\r` korunur (C7). Geçersiz UTF-8 baytları `U+FFFD` olur.
+- Adı çıkarılamayan (hata kurtarma sonucu) tanımlar fonksiyon chunk'ı olmaz; 4. adımda modül koduna düşecek.
+
 ## Doğrulama
 - `uv run python -m pytest`: **152 geçti** (sağlık kontrolü düzeltmelerinden sonra); `ruff check` ve `ruff format --check` temiz.
+- Adım 2, klon üzerinde (betik `data/out/s03_step2_check.py`): istisna yok; **3 647 fonksiyon chunk'ı** (kaynak 169,
+  test 3 478; planlama ölçümüyle birebir); `text`'i atıf yaptığı satırlardan farklı olan 0; repo genelinde yinelenen kimlik
+  0; 4 000 baytı aşan 161 (5. adımda bölünecek).
+- Adım 2 sonrası `uv run python -m pytest`: **210 geçti**.
 
 ## Açık işler
 1. P10: `.claude/settings.json`'daki `ruff*` izninin daraltılması (sahibi yapacak; kurallar sohbette verildi). Yakalayıcı test eklendi.
