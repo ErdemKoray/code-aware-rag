@@ -25,8 +25,8 @@ yeni alanlar varsayılan değerle eklenir. Şimdiden boş yer tutucu alan **aç�
 | 1 | `Settings.max_chunk_bytes`, `Chunk` veri modeli | `5fb4190 feat(config): add max_chunk_bytes setting`, `feat(chunking): add chunk data model` |
 | 2 | Fonksiyon chunk'ları (`chunking/chunker.py::chunk_source`) | `245fea8 feat(chunking): chunk module-level functions` |
 | (ek) | `.claude/settings.json`: geniş `ruff*` izinleri sahibi tarafından kaldırıldı | `7493ab6 chore: narrow ruff permissions to the project root` |
-| 3 | Sınıfların bölünmesi (`class_header`, `method`, `class`, iç sınıflar) | `feat(chunking): split classes into header and members` |
-| 4 | Modül düzeyi bloklar, sınıf blokları, yorumların bağlanması, bileşik ifadeler | bekliyor |
+| 3 | Sınıfların bölünmesi (`class_header`, `method`, `class`, iç sınıflar) | `0e4c93a feat(chunking): split classes into header and members` |
+| 4 | Modül düzeyi bloklar, sınıf blokları, yorumların bağlanması, bileşik ifadeler | `feat(chunking): add module and class blocks` |
 | 5 | Sınırı aşan parçaların bölünmesi | bekliyor |
 | 6 | `rag chunk-debug` | bekliyor |
 | 7 | Klon genelinde kalıcı test, istatistikler (200 bayt altı chunk sayısı dahil), README | bekliyor |
@@ -172,7 +172,22 @@ buraya yazılacak; karar sonra.
 - Metot bağlamı: `path`, `Sınıf.metot`, doğrudan sınıfın `class ...:` imzası (decorator'sız, çok satırlıysa olduğu gibi).
   Başlık bağlamı: `path`, ad, metot listesi.
 
+### Satır sahipliği (adım 4)
+- Kendi chunk'ı olan tanımlar ("üyeler") satır aralıklarını alır: decorator'lar dış node'dan gelir, hemen üstteki **yalnız
+  yorum satırları** (arada boş satır yok, başka bir üyeye ait değil) eklenir. Üyeler arasında kalan dolu satırlar blok olur:
+  modülde `module`, sınıfta ilk üyeden öncesi `class_header`, sonrakiler `class_block`. Bloklar baştan ve sondan boş satır
+  içermez. Böylece C8 yapı gereği sağlanır.
+- "Yorum satırı" tree-sitter'ın `comment` node'undan belirlenir; string içindeki `#` satırı yorum sayılmaz.
+- Başka koda ait bir satırda başlayan tanım (yalnız hatalı ya da tek satırlık yazımlarda) kendi chunk'ını almaz.
+- `defined_names`: bloğun içinde kalıp kendi chunk'ı olmayan en dış tanımlar (pratikte `if`/`try` içindekiler, C3). Sınıf
+  içinde `Sınıf.ad` biçiminde. Bileşik ifade komşu modül koduyla aynı `module` chunk'ına girer ve bölünmez (boyut sınırı hariç).
+
 ## Doğrulama
+- Adım 4, klon üzerinde (`data/out/s03_step4_check.py`): 668 dosya → **5 196 chunk** (`function` 3 647, `module` 889,
+  `method` 278, `class` 276, `class_header` 106, **`class_block` 0**: FastAPI'de metotlar arasında sınıf kodu yok).
+  Chunk'sız dolu satır **0**, iki chunk'ta geçen satır **0**, atıf farkı 0, yinelenen kimlik 0. `defined_names` taşıyan
+  3 chunk: `Color`/`PyExtraColor`, `EmailStr`, `DummyUser`. Yalnız yorumdan oluşan 76 chunk (çoğu bölüm başlığı yorumu).
+  4 000 baytı aşan 184 (5. adım).
 - `uv run python -m pytest`: **152 geçti** (sağlık kontrolü düzeltmelerinden sonra); `ruff check` ve `ruff format --check` temiz.
 - Adım 2, klon üzerinde (betik `data/out/s03_step2_check.py`): istisna yok; **3 647 fonksiyon chunk'ı** (kaynak 169,
   test 3 478; planlama ölçümüyle birebir); `text`'i atıf yaptığı satırlardan farklı olan 0; repo genelinde yinelenen kimlik
