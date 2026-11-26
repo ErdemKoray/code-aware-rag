@@ -14,7 +14,7 @@ def test_help_lists_all_commands():
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    for command in ("index", "search", "ask", "scan", "parse-debug"):
+    for command in ("index", "search", "ask", "scan", "parse-debug", "chunk-debug"):
         assert command in result.output
 
 
@@ -34,6 +34,7 @@ def isolated_settings(monkeypatch):
     # Environment variables beat .env, so these tests do not depend on the dev's .env.
     monkeypatch.delenv("FASTAPI_REPO_PATH", raising=False)
     monkeypatch.setenv("MAX_FILE_SIZE_BYTES", "500000")
+    monkeypatch.setenv("MAX_CHUNK_BYTES", "4000")
 
 
 def touch(root: Path, relative: str, content: bytes = b"") -> None:
@@ -216,6 +217,91 @@ def test_format_parse_debug_aligns_columns_to_the_longest_type():
 
     first, second = report.splitlines()[1:]
     assert first.index("L1-1") == second.index("L2-2")
+
+
+# --- chunk-debug command ---------------------------------------------------
+
+
+def chunk_rows(output: str) -> list[list[str]]:
+    """Split every line after the two header lines into whitespace separated tokens."""
+    return [line.split() for line in output.splitlines()[2:]]
+
+
+def test_chunk_debug_prints_headers_then_one_row_per_chunk(tmp_path):
+    source_file = tmp_path / "sample.py"
+    source_file.write_bytes(
+        b"import os\n\ndef f():\n    pass\n\nclass A:\n    def g(self):\n        pass\n"
+    )
+
+    result = runner.invoke(app, ["chunk-debug", str(source_file)])
+
+    assert result.exit_code == 0
+    assert result.output.splitlines()[:2] == [
+        "has_error: False",
+        "chunks: 4 (max size: 4000 bytes)",
+    ]
+    assert chunk_rows(result.output) == [
+        ["module", "L1-1", "9", "B"],
+        ["function", "L3-4", "17", "B", "f"],
+        ["class_header", "L6-6", "8", "B", "A"],
+        ["method", "L7-8", "29", "B", "A.g"],
+    ]
+    assert result.output.isascii()
+
+
+def test_chunk_debug_uses_the_size_limit_from_settings(tmp_path, monkeypatch):
+    source_file = tmp_path / "long.py"
+    source_file.write_bytes(b"def f():\n    first = 1\n    second = 2\n")
+    monkeypatch.setenv("MAX_CHUNK_BYTES", "24")
+
+    result = runner.invoke(app, ["chunk-debug", str(source_file)])
+
+    assert "max size: 24 bytes" in result.output
+    assert chunk_rows(result.output) == [
+        ["function", "L1-2", "22", "B", "f", "[1/2]"],
+        ["function", "L3-3", "14", "B", "f", "[2/2]"],
+    ]
+
+
+def test_chunk_debug_shows_names_without_their_own_chunk(tmp_path):
+    source_file = tmp_path / "fallback.py"
+    source_file.write_bytes(
+        b"try:\n    import x\nexcept ImportError:\n    class X:\n        pass\n"
+    )
+
+    result = runner.invoke(app, ["chunk-debug", str(source_file)])
+
+    assert result.output.splitlines()[-1].endswith("defines: X")
+
+
+def test_chunk_debug_reports_syntax_errors_with_exit_code_zero(tmp_path):
+    source_file = tmp_path / "broken.py"
+    source_file.write_bytes(b"def f(:\n    pass\n")
+
+    result = runner.invoke(app, ["chunk-debug", str(source_file)])
+
+    assert result.exit_code == 0
+    assert result.output.splitlines()[0] == "has_error: True"
+
+
+def test_chunk_debug_empty_file(tmp_path):
+    source_file = tmp_path / "empty.py"
+    source_file.write_bytes(b"")
+
+    result = runner.invoke(app, ["chunk-debug", str(source_file)])
+
+    assert result.output.splitlines() == [
+        "has_error: False",
+        "chunks: 0 (max size: 4000 bytes)",
+    ]
+
+
+@pytest.mark.parametrize("name", ["nope.py", "."])
+def test_chunk_debug_unreadable_path_exits_with_code_two(tmp_path, name):
+    result = runner.invoke(app, ["chunk-debug", str(tmp_path / name)])
+
+    assert result.exit_code == 2
+    assert "Error: cannot read" in result.output
 
 
 # --- format_scan_report ----------------------------------------------------

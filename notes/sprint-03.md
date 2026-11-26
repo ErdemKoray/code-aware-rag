@@ -27,8 +27,8 @@ yeni alanlar varsayılan değerle eklenir. Şimdiden boş yer tutucu alan **aç�
 | (ek) | `.claude/settings.json`: geniş `ruff*` izinleri sahibi tarafından kaldırıldı | `7493ab6 chore: narrow ruff permissions to the project root` |
 | 3 | Sınıfların bölünmesi (`class_header`, `method`, `class`, iç sınıflar) | `0e4c93a feat(chunking): split classes into header and members` |
 | 4 | Modül düzeyi bloklar, sınıf blokları, yorumların bağlanması, bileşik ifadeler | `cdf82e1 feat(chunking): add module and class blocks` |
-| 5 | Sınırı aşan parçaların bölünmesi (`chunking/split.py`) | `feat(chunking): split oversized chunks` |
-| 6 | `rag chunk-debug` | bekliyor |
+| 5 | Sınırı aşan parçaların bölünmesi (`chunking/split.py`) | `c5b457a feat(chunking): split oversized chunks` |
+| 6 | `rag chunk-debug` | `feat(cli): add chunk-debug command` |
 | 7 | Klon genelinde kalıcı test, istatistikler (200 bayt altı chunk sayısı dahil), README | bekliyor |
 
 ## S03 öncesi sağlık kontrolü
@@ -191,6 +191,13 @@ buraya yazılacak; karar sonra.
 - Sınıra sığmayan tek satır bölünmez (C7: metin satırların aynısı).
 - Her parça aynı `kind`, `qualname`, `context`'i taşır; `part/part_count` 1 tabanlı. Parçalar baştan/sondan boş satır içermez.
   `defined_names` adın başladığı parçaya yazılır. Aynı kurallar `module`, `class_header`, `class_block`, `class` için de geçerli.
+
+### `rag chunk-debug <dosya>` (adım 6)
+- Çıktı: `has_error` satırı, `chunks: N (max size: B bytes)`, sonra chunk başına bir satır: tür, `Lx-y`, bayt boyutu, nitelikli ad,
+  bölünmüşse `[i/n]`, varsa `defines: ...`. Sınır `Settings.max_chunk_bytes`.
+- `parse-debug` ile aynı davranış: sözdizimi hatalı dosyada çıkış kodu 0, okunamayan yolda `Error: cannot read ...` ve 2
+  (okuma ortak `_read_source` yardımcısında). Gerçek dosyada elle denendi (`fastapi/encoders.py`).
+- İlk çalıştırmada bir test başarısızdı: beklenen metot boyutunu yanlış hesaplamıştım (32 değil 29 bayt).
 
 ## Doğrulama
 - Adım 5, klon üzerinde (`data/out/s03_step5_check.py`, sınır 4 000): 668 dosya → **5 737 chunk**, 0,80 sn. Kayıp satır 0,
