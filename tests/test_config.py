@@ -52,3 +52,27 @@ def test_max_file_size_bytes_must_be_positive(monkeypatch, value):
 
     with pytest.raises(ValidationError, match="max_file_size_bytes"):
         Settings(_env_file=None)
+
+
+def test_max_chunk_bytes_defaults_to_4_000(monkeypatch):
+    monkeypatch.delenv("MAX_CHUNK_BYTES", raising=False)
+
+    settings = Settings(_env_file=None)
+
+    assert settings.max_chunk_bytes == 4_000
+
+
+def test_max_chunk_bytes_can_be_overridden_from_env(monkeypatch):
+    monkeypatch.setenv("MAX_CHUNK_BYTES", "1234")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.max_chunk_bytes == 1234
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_max_chunk_bytes_must_be_positive(monkeypatch, value):
+    monkeypatch.setenv("MAX_CHUNK_BYTES", value)
+
+    with pytest.raises(ValidationError, match="max_chunk_bytes"):
+        Settings(_env_file=None)

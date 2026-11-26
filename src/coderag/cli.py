@@ -5,6 +5,8 @@ from typing import Annotated
 import typer
 from tree_sitter import Node
 
+from coderag.chunking.chunker import chunk_source
+from coderag.chunking.model import Chunk
 from coderag.config import Settings
 from coderag.parsing.python import ParseResult, line_range, parse
 from coderag.scan import ScanResult, scan
@@ -92,17 +94,56 @@ def format_parse_debug(result: ParseResult) -> str:
     return "\n".join(lines)
 
 
-@app.command("parse-debug")
-def parse_debug(path: Annotated[Path, typer.Argument(help="Python file to parse.")]) -> None:
-    """Print the top-level syntax nodes of a Python file with their line ranges."""
+def _read_source(path: Path) -> bytes:
+    """The bytes of a file, or a one-line error and exit code 2."""
     try:
-        source = path.read_bytes()
+        return path.read_bytes()
     except OSError as error:
         typer.echo(f"Error: cannot read {path}: {error.strerror or error}", err=True)
         raise typer.Exit(code=2) from error
+
+
+@app.command("parse-debug")
+def parse_debug(path: Annotated[Path, typer.Argument(help="Python file to parse.")]) -> None:
+    """Print the top-level syntax nodes of a Python file with their line ranges."""
+    source = _read_source(path)
     # A file with syntax errors is still reported (exit code 0): this tool describes, it
     # does not judge.
     typer.echo(format_parse_debug(parse(source)))
+
+
+def format_chunk_debug(chunks: tuple[Chunk, ...], has_error: bool, max_chunk_bytes: int) -> str:
+    """Render one line per chunk: kind, lines, size, name, part and unchunked names."""
+    lines = [
+        f"has_error: {has_error}",
+        f"chunks: {len(chunks)} (max size: {max_chunk_bytes} bytes)",
+    ]
+    kind_width = max((len(chunk.kind) for chunk in chunks), default=0)
+    ranges = [f"L{chunk.start_line}-{chunk.end_line}" for chunk in chunks]
+    range_width = max((len(text) for text in ranges), default=0)
+    size_width = max((len(str(chunk.size_bytes)) for chunk in chunks), default=0)
+    for chunk, line_text in zip(chunks, ranges, strict=True):
+        line = (
+            f"{chunk.kind:<{kind_width}}  {line_text:<{range_width}}  "
+            f"{chunk.size_bytes:>{size_width}} B"
+        )
+        if chunk.qualname is not None:
+            line += f"  {chunk.qualname}"
+        if chunk.part_count > 1:
+            line += f"  [{chunk.part}/{chunk.part_count}]"
+        if chunk.defined_names:
+            line += f"  defines: {', '.join(chunk.defined_names)}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+@app.command("chunk-debug")
+def chunk_debug(path: Annotated[Path, typer.Argument(help="Python file to chunk.")]) -> None:
+    """Print the chunks of a Python file with their line ranges and sizes."""
+    source = _read_source(path)
+    max_chunk_bytes = Settings().max_chunk_bytes
+    chunks = chunk_source(source, path.as_posix(), max_chunk_bytes)
+    typer.echo(format_chunk_debug(chunks, parse(source).has_error, max_chunk_bytes))
 
 
 @app.command()

@@ -1,7 +1,7 @@
 [project]
 name = "coderag"
 version = "0.1.0"
-description = "Add your description here"
+description = "AST-based retrieval-augmented generation over Python repositories, with file:line citations."
 readme = "README.md"
 authors = [
     { name = "Koray Erdem", email = "korayerdem5252@gmail.com" }
@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "pathspec>=1.1.1",
+    "pydantic>=2.14.1",
     "pydantic-settings>=2.15.0",
     "tree-sitter>=0.27.0",
     "tree-sitter-python>=0.25.0",
@@ -29,6 +30,11 @@ dev = [
 
 [tool.ruff]
 line-length = 100
+# data/ holds the target repository and scratch output: skip it even when a path inside it
+# is passed explicitly (force-exclude). Limit: files in data/repos/fastapi follow that
+# project's own pyproject.toml, so these two settings do not reach them.
+extend-exclude = ["data/**"]
+force-exclude = true
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

@@ -17,7 +17,13 @@
 - FastAPI tag: 0.143.0 / SHA: f5c6e9b4f9cadc1bf0f9a1fd672e621206b63007
 
 ## Doğrulama
-(`uv run rag --help` ve `uv run pytest -v` çıktılarını buraya yapıştır)
+`uv run rag --help` ve `uv run pytest -v` çıktıları sprint sırasında bu nota kaydedilmedi. Kod o tarihten sonra
+değiştiği için burada sonradan üretilmiş bir çıktıya yer verilmiyor; sprint sonundaki durum `sprint-00` etiketindedir.
+Güncel not: bu makinede başlatıcı `.exe` dosyaları Windows Uygulama Denetimi tarafından engellendiğinden komutlar
+`uv run python -m coderag --help` ve `uv run python -m pytest` biçiminde çalıştırılıyor.
+
+## Açık işler
+- Aşağıdaki hakimiyet soruları cevaplanacak (sahibi yazacak).
 
 ## Hakimiyet soruları
 - uv.lock neyi garanti eder?

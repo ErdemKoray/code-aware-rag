@@ -2,14 +2,21 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
   contents: read
 
+# A new push to a pull request cancels its older run; runs on main always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -32,6 +39,6 @@ jobs:
         run: uv run python -m ruff format --check .
 
       # data/repos/ is gitignored, so the FastAPI clone is absent in CI. Tests that
-      # need it must skip themselves when it is missing; none do today.
+      # need it skip themselves when it is missing.
       - name: Test
         run: uv run python -m pytest

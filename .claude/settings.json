@@ -3,13 +3,17 @@
   "permissions": {
     "allow": [
       "PowerShell(uv run python -m pytest*)",
-      "PowerShell(uv run python -m ruff*)",
       "PowerShell(git add *)",
       "PowerShell(git commit *)",
       "Bash(uv run python -m pytest*)",
-      "Bash(uv run python -m ruff*)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "PowerShell(uv run python -m ruff check .)",
+      "PowerShell(uv run python -m ruff format .)",
+      "PowerShell(uv run python -m ruff format --check .)",
+      "Bash(uv run python -m ruff check .)",
+      "Bash(uv run python -m ruff format .)",
+      "Bash(uv run python -m ruff format --check .)"
     ],
     "ask": [
       "PowerShell(git push *)",

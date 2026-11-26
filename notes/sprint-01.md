@@ -1,14 +1,14 @@
 # Sprint 01 — Dosya tarayıcı (`src/coderag/scan.py`)
 
-Branch: `sprint/s01-scanner` · Başlangıç: 2026-11-18 · Son güncelleme: 2026-11-25
+Branch: `sprint/s01-scanner` · Başlangıç: 2026-11-18 · Son güncelleme: 2026-11-26
 
 ## Amaç
 FastAPI reposunda indekslenecek `.py` dosyalarının **deterministik** listesini üretmek.
 Dışlanan her dosya için bir **gerekçe kodu** vermek.
 
 ## Durum
-Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budama, sıralama) bitti.
-`scan()` tamamlandı: budama, `unreadable_dirs` ve dört dosya kuralı (K2 sırasıyla `SYMLINK`, `GITIGNORED`, `TOO_LARGE`, `UNREADABLE`) çalışıyor ve gerçek FastAPI klonunda doğrulandı (aşağıda). Python 3.12 ve 3.14 doğrulaması PR'ın CI'ında yapıldı (aşağıda).
+**Sprint tamamlandı:** PR #3 ile `main`'e merge edildi ve `sprint-01` etiketlendi.
+Veri modeli, `is_test_path`, `load_gitignore`, `scan()` (budama, `unreadable_dirs` ve K2 sırasıyla `SYMLINK`, `GITIGNORED`, `TOO_LARGE`, `UNREADABLE`) ve `rag scan` komutu çalışıyor; gerçek FastAPI klonunda ve CI'da Python 3.12 ile 3.14'te doğrulandı (aşağıda).
 
 ## Adımlar ve commit'ler
 
@@ -27,7 +27,7 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 | c2a) | `ScanResult.unreadable_dirs` + `os.walk(onerror=...)` | `cd9d606 feat(scan): report directories that cannot be listed` |
 | c2b) | `SYMLINK` ve `GITIGNORED` kontrolleri (`_classify_file`) | `b6149d5 feat(scan): exclude symlinks and gitignored files` |
 | c2c) | `TOO_LARGE` ve `UNREADABLE` (dosya) kontrolleri, öncelik testleri | `89140dc feat(scan): exclude oversized and unreadable files` |
-| c2d) | Gerçek FastAPI klonunda doğrulama, sonuçlar notlara | `docs: record fastapi scan results` (bu commit) |
+| c2d) | Gerçek FastAPI klonunda doğrulama, sonuçlar notlara | `5f23ef2 docs: record fastapi scan results` |
 | CLI | `rag scan [PATH]` komutu | `6f7e6a4 feat(cli): add scan command` |
 | Kabul | `git ls-files` ile tarama sonucunun karşılaştırılması | `5af79e9 docs: record scan acceptance check` |
 | Düzeltme | Symlink tespiti `os.path.islink` ile (Python 3.12 uyumu) | `ffab71b fix(scan): detect symlinks with os.path.islink` |
@@ -53,7 +53,7 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 - **K6 — Budanan klasörler:** `.git`, `.venv`, `venv`, `__pycache__`, `node_modules`, `build`, `dist`, `.tox`, `.mypy_cache`, `.pytest_cache`, `.ruff_cache`, `docs_src`, `scripts`.
   Gerekçe: `docs_src` yüzlerce küçük eğitim örneği içeriyor ve iç işleyiş sorularında aramayı boğar; `scripts` geliştirme araçları. Liste modül sabiti (`PRUNED_DIR_NAMES`). Eşleşme tam ad üzerinden (`scripts_extra` budanmaz).
 - **K7 — Boyut eşiği 500 KB (`500_000` bayt);** `size_bytes <= eşik` dahil, büyükse `TOO_LARGE`. Eşik `Settings.max_file_size_bytes` ile ayarlanabilir.
-  Gerekçe: `applications.py`, `routing.py` gibi çekirdek dosyalar uzun docstring'ler yüzünden büyük; düşük eşik onları yanlışlıkla dışlar. **Eşik veriyle doğrulanacak** (aşağıda açık işler).
+  Gerekçe: `applications.py`, `routing.py` gibi çekirdek dosyalar uzun docstring'ler yüzünden büyük; düşük eşik onları yanlışlıkla dışlar. Eşik gerçek veriyle doğrulandı (bkz. Doğrulama).
   `1 KB` yerine bayt kullanıldı çünkü "KB" 1000 mi 1024 mü belirsiz; birim alan adında.
 - **K8 — Tüm sembolik linkler `SYMLINK` ile dışlanır, izlenmez.** Klasör linkleri gezilmez ve kayıt üretmez.
   Gerekçe: döngü riski yok; Windows'ta link oluşturmak yetki gerektiriyor, bu yüzden link testleri link kurulamazsa `skip` edilir.
@@ -97,11 +97,12 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 - Testlerde ortam değişkenleri (`MAX_FILE_SIZE_BYTES`, `FASTAPI_REPO_PATH`) `.env`'den baskındır; testler geliştiricinin `.env`'ine bağımlı değil.
 
 ### CI (`.github/workflows/ci.yml`)
+Bu bölüm S01 sonundaki kurulumu anlatır; sonraki değişiklikler `sprint-02.md` ve `sprint-03.md` içinde.
 - Tetikleyici: her `push` ve `pull_request`. `ubuntu-latest`, matris `["3.12", "3.14"]`, `fail-fast: false` (bir sürümün hatası diğerini gizlemesin). `permissions: contents: read`.
 - Adımlar: `uv sync --locked` (kilit dosyası güncel değilse CI kırılır, bilerek), sonra CLAUDE.md'deki `python -m` biçimiyle `ruff check`, `ruff format --check`, `pytest`.
 - **`UV_PYTHON` ortam değişkeni** matris sürümünü taşır: projede `.python-version` var ve `uv run` onu matris sürümünün üstüne yazıp ortamı yeniden kurabilirdi.
-- **Klon gerektiren test yok:** testlerin hiçbiri `data/repos/fastapi`'ye ihtiyaç duymuyor (`FASTAPI_REPO_PATH` testlerde `tmp_path`'e yönlendiriliyor; `data/repos/` zaten gitignore'da). Bu yüzden atlama mekanizması eklenmedi; klona bağlı bir test eklenirse kendi kendini `skip` etmeli (workflow'da yorum olarak yazıldı).
-- Aksiyon sürümleri (`actions/checkout@v4`, `astral-sh/setup-uv@v6`) bilinen kararlı ana sürümler; güncel olup olmadıkları ağdan doğrulanmadı (`gh` kurulu değil).
+- **S01'de klon gerektiren test yoktu** (`FASTAPI_REPO_PATH` testlerde `tmp_path`'e yönlendiriliyor; `data/repos/` gitignore'da), bu yüzden atlama mekanizması eklenmedi. Kural: klona bağlı test kendi kendini `skip` eder (ilk örnekleri S02 ve S03'te eklendi).
+- S01'de kullanılan aksiyon sürümleri `actions/checkout@v4` ve `astral-sh/setup-uv@v6` idi; sonradan yükseltildi.
 
 ### c2 için kayıtlı karar
 - **`os.walk`'un listeleyemediği klasörler `ScanResult.unreadable_dirs` alanına yazılacak.**
@@ -110,9 +111,9 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
   Kenar durum kararı: **kökün kendisi listelenemezse** `OSError` yukarı çıkar (K10 ile aynı mantık: erişilemeyen kök çağıran tarafın sorunu, "eksik ama devam" sayılmaz). Testte `os.scandir` `monkeypatch` ile `PermissionError` fırlatacak şekilde değiştirilir (Windows'ta izin kaldırmak güvenilir değil).
 
 ## Doğrulama
-- `uv run python -m pytest`: **108 passed, 0 skipped** (`rag scan` sonrası, 2026-11-25).
+- `uv run python -m pytest`: **108 passed, 0 skipped** (S01 sonunda, 2026-11-25).
 - `uv run python -m ruff check .` ve `uv run python -m ruff format --check .`: temiz.
-- **Symlink testi:** `test_scan_does_not_follow_directory_symlinks` ilk çalıştırmada bu makinede atlanmıştı (link oluşturulamadı). Geliştirici Modu açıldıktan sonra atlanmadan çalıştı ve geçti: klasör linkleri gezilmiyor ve kayıt üretmiyor (K8 madde 6).
+- **Symlink testi:** `test_scan_does_not_follow_directory_symlinks` ilk çalıştırmada bu makinede atlanmıştı (link oluşturulamadı). Geliştirici Modu açıldıktan sonra atlanmadan çalıştı ve geçti: klasör linkleri gezilmiyor ve kayıt üretmiyor (K8 madde 6). Dosya sembolik linki testleri de aynı koşula bağlı: link kurulamayan ortamda `skip` olurlar.
 - **Gerçek repo duman testi** (`data/repos/fastapi`, `Settings().max_file_size_bytes = 500_000`, 2026-11-25; betik scratchpad'de, repoya girmedi):
   - `included` 668 dosya, bunların **616'sı test** (`tests/` 616, `fastapi/` 52). `excluded` 0: kök `.gitignore` hiçbir `.py` dosyasını elemedi, sembolik link, büyük dosya ve okunamaz dosya yok. `unreadable_dirs` boş.
   - `pruned_dirs`: `.git`, `docs_src`, `scripts`.
@@ -130,7 +131,6 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 - **Python 3.12 ile test: ÇALIŞTIRILAMADI.** `uv run --python 3.12 python -m pytest` için uv CPython 3.12.15'i indirdi ama Windows Uygulama Denetimi yorumlayıcıyı engelledi (`os error 4551`, `Failed to spawn: python`). CLAUDE.md ilkeyi başka yolla aşmayı yasakladığı için denenmedi. Proje `.venv`'inin bozulmaması için deneme ayrı bir ortam dizininde yapıldı; `.venv` ve `uv.lock` değişmedi.
   Dolaylı kanıt: `ruff check --target-version py312` temiz (ruff, hedef sürümde geçersiz sözdizimini hata olarak bildirir). Bu bir test çalıştırması değildir; yerelde 3.12'de davranış doğrulanmış sayılmaz.
 - **Python 3.12 ve 3.14: CI'da doğrulandı (2026-11-26).** S01 PR'ının (#3) CI'ı Python 3.12 ve 3.14 matrisinin ikisinde de yeşil geçti: `uv sync --locked`, `ruff check`, `ruff format --check` ve `pytest` iki sürümde de başarılı. Bilgi sahibinden alındı; Actions sonucunu bu oturumdan görmedim. Böylece `requires-python >=3.12` iddiası ve `os.path.islink` düzeltmesinin 3.12'de çalıştığı doğrulanmış sayılır. Yerelde 3.12 hâlâ App Control tarafından engelli, doğrulama CI üzerinden.
-- c2'deki symlink testleri de aynı koşula bağlı: link kurulamayan ortamda `skip` olacak.
 
 ## Açık işler
 1. ~~c2 (dışlama kuralları, `unreadable_dirs`)~~ **Bitti** (c2a–c2c).
@@ -138,7 +138,7 @@ Veri modeli, `is_test_path`, `load_gitignore` ve `scan()` iskeleti (gezme, budam
 3. ~~Gerçek repoda duman testi~~ **Bitti:** 668 dahil / 616 test / 0 dışlanan.
 4. ~~CLI özeti~~ **Bitti:** `rag scan [PATH]` (bkz. Kararlar → CLI). `index` komutuna dokunulmadı; o S10'un işi.
 5. İç içe `.gitignore`: gerekirse ölçüp sonraki iterasyona.
-6. ~~Python 3.12 testleri~~ **Kapandı (2026-11-26):** CI'da hem 3.12 hem 3.14 yeşil geçti (bkz. Doğrulama). Aşağıdaki ayrıntı tarihsel kayıt olarak duruyor. Eski not: App Control 3.12 yorumlayıcısını yerelde engelliyor. `.github/workflows/ci.yml` eklendi (push ve pull_request, `ubuntu-latest`, Python 3.12 ve 3.14 matrisi; `uv sync --locked`, `ruff check`, `ruff format --check`, `pytest`). **İlk yeşil CI çalışması görülene kadar `requires-python >=3.12` iddiası doğrulanmamıştır;** push yapılmadığı için workflow henüz hiç çalışmadı ve YAML'ı yerelde de ayrıştırılamadı (pyyaml kurulu değil).
+6. ~~Python 3.12 testleri~~ **Kapandı (2026-11-26):** CI'da hem 3.12 hem 3.14 yeşil geçti (bkz. Doğrulama). Yerelde 3.12 yorumlayıcısı App Control tarafından engelli kalıyor.
 
 ## Hakimiyet soruları
 - `os.walk`'ta `dirnames[:] = kept` neden `dirnames = kept` değil?

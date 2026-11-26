@@ -1,6 +1,10 @@
 # Sprint 02 — tree-sitter ayrıştırıcı (`src/coderag/parsing/python.py`)
 
-Branch: `sprint/s02-parser` · Başlangıç: 2026-11-26
+Branch: `sprint/s02-parser` · Başlangıç: 2026-11-26 · Son güncelleme: 2026-11-26
+
+## Durum
+**Sprint tamamlandı:** kapsamdaki işlerin hepsi yapıldı, PR #4 ile `main`'e merge edildi (`4b6f577`) ve `sprint-02`
+etiketlendi. PR'ın CI'ı yeşil geçti (Açık işler 4).
 
 ## Amaç
 Python kaynağını tree-sitter ile sözdizimi ağacına çevirmek; ağaçta hata olup olmadığını bildirmek.
@@ -28,6 +32,7 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
 | 3 | `rag parse-debug <dosya>` + 9 test | `d4d7378 feat(cli): add parse-debug command` |
 | 4 | Tüm FastAPI dosyalarının ayrıştırılması: kalıcı test (klon yoksa `skip`) + sayılar | `1e73578 test(parsing): parse every fastapi file` |
 | 5 | `notes/tree-sitter.md`: gözlemden derlenen node tipleri, alanlar, sınır durumları | `4c941d7 docs: add tree-sitter node reference` |
+| 5 | Son commit hash'i bu nota işlendi | `d03927d docs: fill in sprint 02 commit hashes` |
 
 ## Kararlar ve gerekçeleri
 
@@ -46,11 +51,12 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
 ### CI bakımı
 - S01'deki CI çalışmasında Node.js 20 uyarısı çıktı. `actions/checkout` `v4` → `v6`, `astral-sh/setup-uv` `v6` → `v7` (Node 24 çalışma zamanı); sürümler sahibinin talimatıyla seçildi, ağdan ben doğrulamadım (`gh` yok).
 - `.github/dependabot.yml`: yalnızca `github-actions` ekosistemi, kök dizin, haftalık. Python bağımlılıkları (`uv`) bilerek kapsam dışı; `uv.lock` elle güncelleniyor.
-- Workflow yerelde çalıştırılamaz; bu değişikliğin doğrulaması bu branch'in push'unda CI'ın yeşil olmasına bağlı.
+- Workflow yerelde çalıştırılamaz; doğrulaması CI'dadır (Açık işler 4).
+- Sprintten sonra Dependabot `actions/checkout` v6 → v7 PR'ını (#5) açtı; sahibi merge etti.
 
 ## Doğrulama
 - **Bağımlılıklar (adım 1):** `uv add` sonrası import hemen denendi: `Language(tree_sitter_python.language())`, `Parser(...)`, `parse(b"def f():\n    pass\n")` → kök `module`, `has_error=False`. **Uygulama Denetimi yerel uzantıyı engellemedi.**
-- **CI için paket durumu:** `uv.lock`'ta `tree-sitter` 0.27.0 için `cp312` ve `cp314` (manylinux x86_64 dahil) hazır paketleri var; `tree-sitter-python` 0.25.0 `cp310-abi3` (tüm 3.10+ sürümlerinde çalışır). CI'ın kaynaktan derleme yapması gerekmiyor. Gerçek CI sonucu push'a bağlı, henüz görülmedi.
+- **CI için paket durumu:** `uv.lock`'ta `tree-sitter` 0.27.0 için `cp312` ve `cp314` (manylinux x86_64 dahil) hazır paketleri var; `tree-sitter-python` 0.25.0 `cp310-abi3` (tüm 3.10+ sürümlerinde çalışır). CI'ın kaynaktan derleme yapması gerekmiyor. Bu, kilit dosyasından çıkarılan bir beklentidir; CI sonucu için Açık işler 4.
 - **Ayrıştırıcı (adım 2), gözlemlenen davranış** (varsayım değil, `parse()` çıktısından; ayrıntılar `notes/tree-sitter.md`'de toplanacak):
   - `async def` ayrı bir node tipi **değil**: `function_definition`, ilk çocuğu anonim `async` jetonu.
   - `decorator` bir **alan adı değil**, `decorated_definition`'ın (tekrarlanan) çocuk node tipi; alan olan `definition`. Testle sabitlendi (`child_by_field_name("decorator") is None`).
@@ -77,4 +83,10 @@ S03'teki yapı-farkında chunker bu ağacın üzerine kurulacak.
 1. **S03'e devredilen sorular** (ayrıntı `notes/tree-sitter.md` bölüm 6 ve 11): modül düzeyindeki `if_statement` (23) ve `try_statement` (18) içindeki tanımlar nasıl ele alınacak? Bunların içinde kaç tanım olduğu **ölçülmedi**.
 2. `has_error=False` her zaman "geçerli kod" demek değil (gövdesiz `def f():`). Chunker'ın buna güvenmemesi gerek.
 3. Python dışı kodlama bildirimi (`# -*- coding: latin-1 -*-`) olan dosya FastAPI'de çıkmadı; sorun gözlenmedi.
-4. CI sonucu: bu branch henüz push edilmedi; `tree-sitter` paketlerinin 3.12/3.14'te Linux'ta kurulması ve 2 klon testinin CI'da atlanması **görülmedi** (yalnızca kilit dosyasındaki paket listesi incelendi).
+4. ~~CI sonucu~~ **Kapandı (2026-11-26):** S02 PR'ının (#4) CI'ı yeşil geçti ve Node.js 20 uyarısı çıkmadı (sahibi Actions'tan teyit etti; sonucu Claude oturumundan görmedim). Yani `tree-sitter` paketleri Linux'ta kuruldu ve aksiyon yükseltmesi uyarıyı giderdi. CI'da klon olmadığı için, yeşil sonuç klon testlerinin atlandığı anlamına gelir (çıktı satırlarını ayrıca incelemedim).
+
+## Hakimiyet soruları
+- `has_error=False` neden "kod geçerli" anlamına gelmez? Bir örnek ver.
+- Bir fonksiyonun decorator'lar dahil satır aralığını hangi node'dan alırsın, neden?
+- `line_range()` neden `end_point.row + 1` ile yetinmiyor?
+- Ağaçta bir fonksiyonun `async` olduğunu nasıl anlarsın?
