@@ -4,7 +4,7 @@
 
 A retrieval-augmented generation system that answers questions about a Python codebase with precise `file:line` citations.
 
-> **Status:** Early development. The project skeleton is in place; the indexing and retrieval pipeline is being built sprint by sprint.
+> **Status:** Early development. The file scanner and the tree-sitter parser work; the structure-aware chunker is being built. Indexing, retrieval and answering are not implemented yet.
 
 ## Why
 
@@ -48,7 +48,7 @@ Question ──► Hybrid search ──► Rerank ──► Graph expansion
 | Milestone | Goal | Status |
 |---|---|---|
 | M0 | Project skeleton, config, CLI stubs | Done |
-| M1 | Structure-aware chunker validated on the target repo | Planned |
+| M1 | Structure-aware chunker validated on the target repo | In progress |
 | M2 | Incremental indexing with dense + sparse vectors | Planned |
 | M3 | Hybrid retrieval with reranking and graph expansion | Planned |
 | M4 | Cited answers via CLI and HTTP API | Planned |
@@ -59,7 +59,7 @@ Question ──► Hybrid search ──► Rerank ──► Graph expansion
 Requirements: Python 3.12+, [uv](https://docs.astral.sh/uv/), git.
 
 ```bash
-git clone https://github.com/<your-username>/code-aware-rag
+git clone https://github.com/ErdemKoray/code-aware-rag
 cd code-aware-rag
 uv sync
 cp .env.example .env
@@ -71,7 +71,7 @@ Clone the target repository at its pinned version:
 
 ```bash
 git clone https://github.com/fastapi/fastapi data/repos/fastapi
-git -C data/repos/fastapi checkout <0.143.0>
+git -C data/repos/fastapi checkout 0.143.0
 ```
 
 Check the setup:
@@ -81,9 +81,52 @@ uv run rag --help
 uv run pytest
 ```
 
+> **Windows Application Control:** if it blocks the launcher executables in `.venv\Scripts`, run the tools through Python instead: `uv run python -m coderag --help`, `uv run python -m pytest`, `uv run python -m ruff check .`
+
+## Commands
+
+### `rag scan [PATH]`
+
+Lists the `.py` files that would be indexed. Without `PATH` it scans the pinned FastAPI clone.
+
+```bash
+uv run rag scan
+uv run rag scan path/to/project
+```
+
+The report shows:
+
+- how many files are included, and how many of them are tests (tests are tagged, not excluded);
+- how many files are excluded, per reason: `symlink`, `gitignored`, `too_large`, `unreadable`;
+- the pruned directories (version control, virtual environments, caches, `build`, `dist`, and also `docs_src` and `scripts`) and any directory that could not be listed;
+- the five largest files and the scan time.
+
+Only the root `.gitignore` is honoured. The size limit is `MAX_FILE_SIZE_BYTES` (default `500000`). The exit code is 2 if the path is missing, is not a directory or cannot be listed.
+
+### `rag parse-debug FILE`
+
+Parses one file with tree-sitter and prints its top-level syntax nodes with 1-based, inclusive line ranges.
+
+```bash
+uv run rag parse-debug data/repos/fastapi/fastapi/params.py
+```
+
+```text
+has_error: False
+import_statement       L1-1
+import_from_statement  L2-2
+...
+class_definition       L19-23  name=ParamTypes
+...
+```
+
+A file with syntax errors is still printed, with `has_error: True` and exit code 0. The exit code is 2 if the file cannot be read.
+
+`rag index`, `rag search` and `rag ask` are not implemented yet.
+
 ## Target repository
 
-Development and evaluation run against a pinned version of the [FastAPI](https://github.com/fastapi/fastapi) source code, so results stay comparable over time.
+Development and evaluation run against a pinned version of the [FastAPI](https://github.com/fastapi/fastapi) source code, so results stay comparable over time. A test checks that the local clone is at this version.
 
 - Tag: `0.143.0`
 - Commit: `f5c6e9b4f9cadc1bf0f9a1fd672e621206b63007`
@@ -92,9 +135,26 @@ Development and evaluation run against a pinned version of the [FastAPI](https:/
 
 ```
 src/coderag/
-  config.py     # settings loaded from .env
-  cli.py        # `rag` command-line entry point
-tests/          # unit tests
-notes/          # sprint notes and design decisions
-data/repos/     # target repositories (not committed)
+  __main__.py     # `python -m coderag` entry point
+  cli.py          # `rag` command-line interface
+  config.py       # settings loaded from the environment and .env
+  scan.py         # finds the .py files to index
+  parsing/
+    python.py     # tree-sitter parser and line ranges
+tests/            # unit tests (those that need the clone are skipped without it)
+notes/            # sprint notes and design decisions (in Turkish)
+data/repos/       # target repositories (not committed)
+data/out/         # temporary output (not committed)
 ```
+
+## Development
+
+```bash
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+```
+
+## License
+
+[MIT](LICENSE)
