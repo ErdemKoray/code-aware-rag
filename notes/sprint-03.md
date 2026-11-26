@@ -3,8 +3,32 @@
 Branch: `sprint/s03-chunker` · Başlangıç: 2026-11-26
 
 ## Durum
-Sağlık kontrolü düzeltmeleri bitti, planlama ölçümleri yapıldı. **Chunker planı ve tasarım kararları onay bekliyor;**
-henüz chunker kodu yok.
+Sağlık kontrolü düzeltmeleri bitti, planlama ölçümleri yapıldı, **plan ve tasarım kararları onaylandı (2026-11-26).**
+Uygulama adım adım sürüyor (bkz. Adımlar).
+
+## Kapsam
+Bu sprint, **orijinal sprint planındaki S03–S05'in** şu parçalarını karşılar: chunk birimleri, sınıfların ele alınışı ve
+boyut kuralları.
+
+| Bu sprint (S03) | Sonraki sprintler |
+|---|---|
+| Chunk birimleri (modül, fonksiyon, sınıf, metot) | **S04:** imza, docstring, decorator listesi, kullanılan import'lar, çağrılar (`calls`), FastAPI route / `Depends` zenginleştirmesi |
+| Sınıfların bölünmesi | **S05 (M1):** `ast` ile karşılaştırma, `reports/phase1.md`, golden set v0 |
+| Boyut sınırı ve büyük parçaların bölünmesi, `rag chunk-debug`, klon genelinde doğrulama | |
+
+Sonraki alanlar mevcut kurucuları bozmadan eklenebilsin diye `Chunk` anahtar sözcüklü (`kw_only`) bir dataclass olacak;
+yeni alanlar varsayılan değerle eklenir. Şimdiden boş yer tutucu alan **açılmaz**.
+
+## Adımlar
+| # | Adım | Commit |
+|---|---|---|
+| 1 | `Settings.max_chunk_bytes`, `Chunk` veri modeli | bekliyor |
+| 2 | Fonksiyon chunk'ları | bekliyor |
+| 3 | Sınıfların bölünmesi (`class_header`, `method`, `class`) | karar bekliyor (Açık işler) |
+| 4 | Modül düzeyi bloklar, sınıf blokları, yorumların bağlanması, bileşik ifadeler | bekliyor |
+| 5 | Sınırı aşan parçaların bölünmesi | bekliyor |
+| 6 | `rag chunk-debug` | bekliyor |
+| 7 | Klon genelinde kalıcı test, istatistikler (200 bayt altı chunk sayısı dahil), README | bekliyor |
 
 ## S03 öncesi sağlık kontrolü
 
@@ -22,9 +46,11 @@ her düzeltme grubu ayrı commit olarak uygulandı.
 | P9 | `.env.example`, `.gitignore`, `.gitmessage`, `__main__.py` diskte LF'ye çevrildi (silip `git checkout --`; içerik aynı) | commit yok: indeks zaten LF idi, diff oluşmadı |
 | P10 | Ruff: `extend-exclude = ["data/**"]`, `force-exclude = true`; `.gitignore`: `.env.*` (`.env.example` hariç). **Kısmi çözüm, aşağıya bak** | `189ff03 chore: exclude data from ruff and ignore env variants` |
 | P13 | CI: `push` yalnızca `main`; `timeout-minutes: 10`; `concurrency` (yalnızca PR çalışmaları iptal edilir, `main` çalışmaları tamamlanır); yanlış yorum düzeltildi. Yerelde çalıştırılamaz, doğrulaması PR'ın CI'ında | `200764a ci: limit push trigger and add timeout and concurrency` |
-| LICENSE | MIT, "Copyright (c) 2026 Koray Erdem" (ilk commit'te ad sırası ters yazılmıştı, düzeltildi) | `e685a04 docs: add mit license`, `docs: fix license holder name` |
+| LICENSE | MIT, "Copyright (c) 2026 Koray Erdem" (ilk commit'te ad sırası ters yazılmıştı, düzeltildi) | `e685a04 docs: add mit license`, `dbb0b61 docs: fix license holder name` |
 | P11 | README: durum ve roadmap, çalışan komutlar (`scan`, `parse-debug`), proje yapısı, düzeltilmiş clone/checkout komutları, Uygulama Denetimi notu, lisans. Komutlar standart biçimde (`uv run rag`, `uv run pytest`); bu biçimler bu makinede engelli olduğu için burada çalıştırılarak denenmedi | `a31987d docs: update readme` |
 | P12 | Sprint notları: eski/çelişen cümleler düzeltildi, `sprint-00`'a "Açık işler", `sprint-02`'ye "Durum" ve "Hakimiyet soruları" açıldı. Mevcut hakimiyet sorularına dokunulmadı, hiçbirine cevap yazılmadı | `23e1995 docs: tidy sprint notes` |
+| (ek) | S02 PR CI sonucu (yeşil, Node.js 20 uyarısı yok) kaydedildi | `5ee22e3 docs: close sprint 02 ci item` |
+| P10 (ek) | Pin testine klon çalışma ağacının temiz olduğu kontrolü | `95e8103 test(config): require a clean fastapi working tree` |
 
 ## Planlama ölçümleri (P4 ve boyutlar)
 
@@ -68,6 +94,39 @@ Gruplar: **kaynak** = scan'in dahil edip test saymadığı 52 dosya; **test** = 
 - Üst düzey tanımların dışında kalan bayt (import, sabit, yorum, boş satır): kaynakta %5, testte %5.
 - Tanım içermeyen, boş olmayan dosya: kaynakta **19**, testte 6. Boş dosya: kaynakta 2, testte 92.
 
+### Karar sonrası ek ölçümler
+Betik `data/out/s03_questions.py`; dahil edilen 668 dosya.
+- Klonda satır sonları LF (`core.autocrlf=false`), CRLF içeren dosya **0**. 4 000 bayttan uzun tek satır **0**: satır sınırında
+  bölme her zaman yeterli.
+- Sınıf: kaynakta 121 (63'ü metotsuz), testte 265 (216'sı metotsuz). **Sınıf içinde sınıf yok** (ölçülen "iç sınıflar" fonksiyon
+  içindeki sınıflar). Metotsuz olup 4 000 baytı aşan: kaynakta 1.
+- Sınıf başına metot imzası listesinin boyutu (bayt):
+
+  | Biçim | p50 | p90 | En büyük | 4 000'i aşan sınıf |
+  |---|---|---|---|---|
+  | Tam imza | 120 | 1 737 | **149 684** (`FastAPI`; `APIRouter` 128 148) | 2 |
+  | Yalnız parametre adları | 49 | 385 | 5 598 (`APIRouter`) | 2 |
+  | Yalnız `def ad` | 19 | 95 | 542 (`APIRouter`) | 0 |
+
+## Chunker tasarım kararları (sahip onaylı)
+
+| # | Karar | Gerekçe |
+|---|---|---|
+| C1 | **Metodu olan sınıf her zaman bölünür** (boyuta bakılmaz): `class_header` chunk'ının metni sınıf başlangıcından (decorator dahil) ilk metoda kadarki satırlar; metot imzalarının listesi `context`'e girer; her metot ayrı chunk. Metodu olmayan sınıf tek `class` chunk'ı. İç fonksiyonlar ebeveyninde kalır; iç sınıflara aynı kural uygulanır | Tutarlı, sembol düzeyinde birimler (sahip, öneri olan "sığıyorsa tek chunk" yerine bunu seçti) |
+| C2 | Bitişik tanım dışı ifadeler `module` chunk'ı; bölünen sınıfta metotlar arasındaki satırlar `class_block` | 19 kaynak dosyasında hiç tanım yok; kaybolmamalı |
+| C3 | Tanım içeren `if`/`try` bileşik ifadesi bölünmez, modül kodu sayılır; içindeki tanım adları `defined_names`'e yazılır | Yalnızca 4 tanım var ve yedek sınıflar `try` bağlamından kopmamalı |
+| C4 | `Settings.max_chunk_bytes = 4000`, ayarlanabilir | Sahip kararı (öneri 8 000 idi). Kaynakta bu sınırı 38 fonksiyon/metot aşıyor |
+| C5 | Sınırı aşan parça: önce imza parametre sınırlarından, sonra gövde ifade sınırlarından, son çare satır; her parça `part/part_count` ve başlık bağlamı taşır | Büyüklük çoğunlukla imzada |
+| C6 | Dev test fonksiyonları da tamamen bölünür | Tutarlılık; ağırlık retrieval'da düşürülür |
+| C7 | `text`, başlangıç–bitiş satırlarının aynen kendisi; yol, nitelikli ad, sınıf imzası `context`'te; boyut sınırı yalnızca `text`'e | Atıfların doğruluğu |
+| C8 | Boş olmayan her satır tam olarak bir chunk'ta; tanımın hemen üstündeki yorum tanıma bağlanır | Kayıp ve örtüşme olmamalı |
+| C9 | Kimlik `(path, qualname, kind, text)` özeti, birebir aynılara sıra eki; satır numarası kimlikte yok | Kod kayınca kimlik değişmesin (artımlı indeksleme) |
+| C10 | `has_error` olan dosya yine chunk'lanır ve işaretlenir, istisna yok | |
+| C11 | Sabit boyutlu karşılaştırma chunker'ı S03 dışında (eval sprint'i) | |
+
+Ertelenen: **çok küçük chunk'ları birleştirme yapılmıyor.** S03 sonunda 200 baytın altındaki chunk sayısı türe göre ölçülüp
+buraya yazılacak; karar sonra.
+
 ## Kararlar ve gerekçeleri
 - **Kodu Claude yazar** (çekirdek mantık dahil). Sprint başında plan ve tasarım kararları sunulur, onaydan sonra her adımda
   `pytest`, `ruff check`, `ruff format --check` geçerse commit edilip devam edilir; kapsanmayan bir tasarım kararında durulur.
@@ -93,4 +152,5 @@ Gruplar: **kaynak** = scan'in dahil edip test saymadığı 52 dosya; **test** = 
 ## Açık işler
 1. P10: `.claude/settings.json`'daki `ruff*` izninin daraltılması (sahibi yapacak; kurallar sohbette verildi). Yakalayıcı test eklendi.
 2. ~~S02 PR'ının (#4) CI sonucu~~ **Kapandı:** yeşil, Node.js 20 uyarısı yok (`sprint-02.md` Açık işler 4).
-3. Chunker planının ve tasarım kararlarının onayı.
+3. **Karar gerekli (adım 3):** `class_header` bağlamındaki metot imzası listesinin biçimi (tam imza 150 KB'a çıkıyor).
+4. S03 sonunda 200 bayt altı chunk sayısını türe göre ölç; birleştirme kararı sonra.
